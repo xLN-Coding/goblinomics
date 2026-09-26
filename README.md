@@ -82,5 +82,14 @@ a page for addon authors. Translations go through CurseForge; see the
 
 ## License
 
-MIT, see `LICENSE`. The bundled libraries in `Libs/` keep their own licences, listed
-in `Libs/README.md`.
+Copyright 2026 xLN. Goblinomics is licensed under the [Mozilla Public License 2.0](LICENSE).
+
+In plain words: you're welcome to write your own modules or addons on top of
+`Goblinomics.API.v1` and release them under any licence you like, closed source
+included. They live in their own files, so the MPL doesn't reach them. If you
+change files of Goblinomics itself and share the result, those files stay under
+the MPL and their source has to be available. And please give a fork its own name:
+the licence doesn't grant any rights to the name "Goblinomics".
+
+The bundled libraries in `Libs/` keep their own licences, listed in
+`Libs/README.md`.
