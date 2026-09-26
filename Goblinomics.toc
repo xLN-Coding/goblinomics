@@ -11,7 +11,7 @@
 ## AddonCompartmentFunc: Goblinomics_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: Goblinomics_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: Goblinomics_OnAddonCompartmentLeave
-## X-Curse-Project-ID: 0
+## X-Curse-Project-ID: 1713049
 ## X-License: MPL-2.0
 
 # Pre-12.1 client failsafe -- MUST load first (arms the per-file guard line)
