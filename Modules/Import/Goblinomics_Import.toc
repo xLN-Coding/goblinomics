@@ -1,0 +1,17 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Import
+## Notes: Import history from Journalator and TSM Accounting
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## OptionalDeps: Goblinomics_Ledger, TradeSkillMaster, Journalator
+## LoadOnDemand: 1
+## SavedVariables: GoblinomicsImportDB
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Import.lua
+TSM.lua
+Journalator.lua
+ImportUI.lua

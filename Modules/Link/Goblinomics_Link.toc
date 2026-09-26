@@ -1,0 +1,14 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Link
+## Notes: Multi-account export and import
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## OptionalDeps: Goblinomics_Vault
+## LoadOnDemand: 1
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Link.lua
+LinkUI.lua

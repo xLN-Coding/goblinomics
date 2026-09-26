@@ -1,0 +1,25 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Gatherer
+## Notes: Farms, session tracker, HUD, highlights, lockouts
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## SavedVariables: GoblinomicsGathererDB
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Gatherer.lua
+Instances.lua
+Farms.lua
+Valuation.lua
+Session.lua
+Highlights.lua
+Lockouts.lua
+Strings.lua
+TextDialog.lua
+HUD.lua
+Summary.lua
+Commands.lua
+FarmEditor.lua
+GathererUI.lua

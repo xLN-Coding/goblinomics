@@ -1,0 +1,16 @@
+name: Idea
+description: Something Goblinomics should do, or do differently.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe it the way you'd use it in the game.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What are you trying to find out or get done? Knowing the problem often helps more than the exact solution.

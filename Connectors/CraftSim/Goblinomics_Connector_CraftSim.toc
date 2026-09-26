@@ -1,0 +1,11 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r CraftSim Connector
+## Notes: Craft cost snapshots for Workshop via CraftSimAPI
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics, CraftSim
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+CraftSim.lua

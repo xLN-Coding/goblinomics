@@ -1,0 +1,23 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Vault
+## Notes: Inventory snapshots, three networth tiers, Gallywix Jealousmeter, alt overview
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## SavedVariables: GoblinomicsVaultDB
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Vault.lua
+Freshness.lua
+Scanner.lua
+Remote.lua
+Networth.lua
+Jealousmeter.lua
+JealousmeterUI.lua
+VaultUI.lua
+Speculative.lua
+SpeculativeUI.lua
+Cards.lua
+Goals.lua

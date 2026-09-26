@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.lua text eol=lf
+*.toc text eol=lf
+*.md text eol=lf
+*.tga binary
+*.blp binary
+*.png binary

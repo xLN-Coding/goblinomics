@@ -1,0 +1,339 @@
+if GOBLINOMICS_CLIENT_BLOCKED then return end
+-- Modules/Vault/Scanner.lua
+-- Records every location with seenAt = time():
+--   bags       Core bag snapshot after ITEMS_DELTA (debounced), at enable and logout
+--   bank       CharacterBankTab_1..6 while the bank is open
+--   warband    AccountBankTab_1..5 while the bank is open (needs the account inventory lock)
+--   mail       attachments and attached gold while the mailbox is open (COD mails excluded)
+--   auctions   active owned auctions (sold ones arrive as mail gold)
+--   equipment  equipped items, all bound
+-- plus the gold of the character and of the warband. Container scans run as jobs.
+local _, ns = ...
+
+local Scanner = {}
+ns.Scanner = Scanner
+
+local API = ns.API
+local ItemKey = API.ItemKey
+
+local WOW_TOKEN = 122284
+local vault
+local bankOpen, mailOpen = false, false
+local pending = {}   -- debounce flags per location
+
+local BANK_BAGS, WARBAND_BAGS = {}, {}
+
+local function BuildBagLists()
+    local e = Enum and Enum.BagIndex or {}
+    for i = 1, 6 do
+        local id = e["CharacterBankTab_" .. i]
+        if id then BANK_BAGS[#BANK_BAGS + 1] = id end
+    end
+    for i = 1, 5 do
+        local id = e["AccountBankTab_" .. i]
+        if id then WARBAND_BAGS[#WARBAND_BAGS + 1] = id end
+    end
+end
+
+local function IsSecret(v)
+    return issecretvalue ~= nil and issecretvalue(v) == true
+end
+
+local function CharLocations()
+    return vault.db.char.locations
+end
+
+local function Changed()
+    if ns.Networth then ns.Networth.Schedule() end
+end
+
+local function Store(target, items, bound, money)
+    target.items = items
+    target.bound = bound
+    target.money = money
+    target.seenAt = time()
+end
+Scanner.Store = Store
+
+local function Debounce(key, delay, fn)
+    if pending[key] then return end
+    pending[key] = true
+    vault:After(delay, function()
+        pending[key] = nil
+        fn()
+    end)
+end
+
+local function Add(items, key, n)
+    items[key] = (items[key] or 0) + n
+end
+
+--- items, bound for a list of container ids; nil when no container is readable.
+local function ScanContainers(bags)
+    local items, bound, readable = {}, {}, false
+    for _, bag in ipairs(bags) do
+        local numSlots = C_Container.GetContainerNumSlots(bag) or 0
+        if numSlots > 0 then readable = true end
+        for slot = 1, numSlots do
+            local info = C_Container.GetContainerItemInfo(bag, slot)
+            if info and info.hyperlink and (info.stackCount or 0) > 0 then
+                local key = ItemKey.FromLink(info.hyperlink)
+                if key then
+                    Add(items, key, info.stackCount)
+                    if API.Bags:IsBound(info, bag, slot) then Add(bound, key, info.stackCount) end
+                end
+            end
+        end
+        API.Yield()
+    end
+    if not readable then return nil end
+    return items, bound
+end
+Scanner.ScanContainers = ScanContainers
+
+-- Bags -------------------------------------------------------------------------
+local function ScanBags()
+    local snap = API.Bags:Snapshot()
+    if not snap then return false end
+    local locs = CharLocations()
+    locs.bags = locs.bags or {}
+    Store(locs.bags, snap.items, snap.bound)
+    Changed()
+    return true
+end
+Scanner.ScanBags = ScanBags
+
+local bagAttempts = 0
+local function WaitForBags()
+    if ScanBags() or bagAttempts >= 20 then return end
+    bagAttempts = bagAttempts + 1
+    vault:After(1, WaitForBags)
+end
+
+-- Bank and warband ------------------------------------------------------------
+local function HasWarbandAccess()
+    if C_PlayerInfo and C_PlayerInfo.HasAccountInventoryLock then
+        return C_PlayerInfo.HasAccountInventoryLock() == true
+    end
+    return true
+end
+
+local function ScanBank()
+    vault:RunJob("scanBank", function()
+        local items, bound = ScanContainers(BANK_BAGS)
+        if items then
+            local locs = CharLocations()
+            locs.bank = locs.bank or {}
+            Store(locs.bank, items, bound)
+        end
+        if HasWarbandAccess() then
+            local wItems, wBound = ScanContainers(WARBAND_BAGS)
+            if wItems then
+                local warband = vault.db.root.warband
+                Store(warband, wItems, wBound)
+                warband.seenBy = vault.db.charKey
+            end
+        end
+        Scanner.UpdateWarbandGold()
+        Changed()
+    end)
+end
+Scanner.ScanBank = ScanBank
+
+function Scanner.UpdateWarbandGold()
+    if not (C_Bank and C_Bank.FetchDepositedMoney and Enum and Enum.BankType) or not HasWarbandAccess() then
+        return
+    end
+    local money = C_Bank.FetchDepositedMoney(Enum.BankType.Account)
+    if type(money) == "number" and not IsSecret(money) then
+        local warband = vault.db.root.warband
+        warband.gold, warband.goldSeenAt = money, time()
+    end
+end
+
+local isBankBag = {}
+
+local function OnBagUpdate(_, bag)
+    if bankOpen and isBankBag[bag] then
+        Debounce("bank", 0.5, ScanBank)
+    end
+end
+
+-- Mail --------------------------------------------------------------------------
+local function ScanMail()
+    local items, bound, money, incomplete = {}, {}, 0, false
+    local count = GetInboxNumItems() or 0
+    local maxAttachments = ATTACHMENTS_MAX_RECEIVE or 16
+    for i = 1, count do
+        local _, _, sender, _, gold, cod, _, hasItem = GetInboxHeaderInfo(i)
+        if sender == nil or sender == RETRIEVING_DATA then
+            incomplete = true
+        elseif (cod or 0) == 0 then
+            money = money + (gold or 0)
+            if hasItem then
+                for j = 1, maxAttachments do
+                    local link = GetInboxItemLink(i, j)
+                    if link then
+                        local key = ItemKey.FromLink(link)
+                        local n = select(4, GetInboxItem(i, j)) or 1
+                        if key then
+                            Add(items, key, n)
+                            -- warbound items can be mailed between own characters
+                            if API.Bags:IsWarboundType(link) then Add(bound, key, n) end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    local locs = CharLocations()
+    locs.mail = locs.mail or {}
+    Store(locs.mail, items, bound, money)
+    Changed()
+    if incomplete then
+        Debounce("mail", 1, ScanMail)
+    end
+end
+Scanner.ScanMail = ScanMail
+
+local function OnMailUpdate()
+    if mailOpen then Debounce("mail", 0.5, ScanMail) end
+end
+
+-- Auctions ------------------------------------------------------------------------
+local function ScanAuctions()
+    local ah = C_AuctionHouse
+    if not (ah and ah.GetNumOwnedAuctions) then return end
+    local items = {}
+    local active = Enum and Enum.AuctionStatus and Enum.AuctionStatus.Active or 0
+    for i = 1, ah.GetNumOwnedAuctions() do
+        local info = ah.GetOwnedAuctionInfo(i)
+        local itemID = info and info.itemKey and info.itemKey.itemID
+        if info and itemID ~= WOW_TOKEN and info.status == active then
+            local key = info.itemLink and ItemKey.FromLink(info.itemLink) or (itemID and ("i:" .. itemID))
+            if key then Add(items, key, info.quantity or 1) end
+        end
+    end
+    local locs = CharLocations()
+    locs.auctions = locs.auctions or {}
+    Store(locs.auctions, items, {})
+    Changed()
+end
+Scanner.ScanAuctions = ScanAuctions
+
+local function OnAuctionHouseShow()
+    if C_AuctionHouse and C_AuctionHouse.QueryOwnedAuctions then
+        pcall(C_AuctionHouse.QueryOwnedAuctions, {})
+    end
+end
+
+-- Equipment -----------------------------------------------------------------------
+local function ScanEquipment()
+    local items = {}
+    for slot = 1, 19 do
+        local link = GetInventoryItemLink("player", slot)
+        local key = link and ItemKey.FromLink(link)
+        if key then Add(items, key, 1) end
+    end
+    local bound = {}
+    for key, n in pairs(items) do bound[key] = n end
+    local locs = CharLocations()
+    locs.equipment = locs.equipment or {}
+    Store(locs.equipment, items, bound)
+    Changed()
+end
+Scanner.ScanEquipment = ScanEquipment
+
+-- Gold ----------------------------------------------------------------------------
+local function UpdateGold(money)
+    if type(money) ~= "number" or IsSecret(money) then return end
+    local c = vault.db.char
+    c.gold, c.goldSeenAt = money, time()
+end
+
+--- Character gold from the core money tracker once its login baseline exists
+-- (GetMoney() can read 0 right after login); retried for up to 30 s.
+local goldAttempts = 0
+function Scanner.ReadGold()
+    local money = API.PlayerMoney()
+    if type(money) == "number" then
+        UpdateGold(money)
+        Changed()
+        return
+    end
+    if goldAttempts < 30 then
+        goldAttempts = goldAttempts + 1
+        vault:After(1, Scanner.ReadGold)
+    end
+end
+
+local function OnMoney(_, payload)
+    if payload.scope == "player" then
+        UpdateGold(payload.total)
+    else
+        local warband = vault.db.root.warband
+        warband.gold, warband.goldSeenAt = payload.total, time()
+    end
+    Changed()
+end
+
+-- Interaction windows ------------------------------------------------------------
+local interactionKind = {}
+
+local function OnInteraction(event, interactionType)
+    local kind = interactionKind[interactionType]
+    if not kind then return end
+    local open = event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW"
+    if kind == "bank" then
+        bankOpen = open
+        if open then
+            ScanBank()
+        elseif ns.Networth then
+            ns.Networth.RecordDay()
+        end
+    elseif kind == "mail" then
+        mailOpen = open
+        if open then Debounce("mail", 0.5, ScanMail) end
+    end
+end
+
+function Scanner.Enable(module)
+    vault = module
+    if #BANK_BAGS == 0 then BuildBagLists() end
+    for _, bag in ipairs(BANK_BAGS) do isBankBag[bag] = true end
+    for _, bag in ipairs(WARBAND_BAGS) do isBankBag[bag] = true end
+    local types = Enum and Enum.PlayerInteractionType or {}
+    if types.Banker then interactionKind[types.Banker] = "bank" end
+    if types.AccountBanker then interactionKind[types.AccountBanker] = "bank" end
+    if types.MailInfo then interactionKind[types.MailInfo] = "mail" end
+
+    module:On("ITEMS_DELTA", function() Debounce("bags", 2, ScanBags) end)
+    module:On("MONEY_DELTA", OnMoney)
+    module:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", OnInteraction)
+    module:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", OnInteraction)
+    module:RegisterEvent("BAG_UPDATE", OnBagUpdate)
+    module:RegisterEvent("MAIL_INBOX_UPDATE", OnMailUpdate)
+    module:RegisterEvent("AUCTION_HOUSE_SHOW", OnAuctionHouseShow)
+    module:RegisterEvent("OWNED_AUCTIONS_UPDATED", function() Debounce("auctions", 0.5, ScanAuctions) end)
+    module:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() Debounce("equipment", 1, ScanEquipment) end)
+
+    Scanner.ReadGold()
+    Scanner.UpdateWarbandGold()
+    ScanEquipment()
+    module:After(5, ScanEquipment)   -- item links can be missing right after login
+    bagAttempts = 0
+    WaitForBags()
+end
+
+function Scanner.Disable()
+    goldAttempts = 0
+    bankOpen, mailOpen = false, false
+    for k in pairs(pending) do pending[k] = nil end
+end
+
+function Scanner.OnLogout()
+    -- never GetMoney() here: the client reports 0 while logging out
+    local money = API.PlayerMoney()
+    if type(money) == "number" then UpdateGold(money) end
+    ScanBags()
+end

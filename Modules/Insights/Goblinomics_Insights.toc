@@ -1,0 +1,17 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Insights
+## Notes: History, cash flow and reports; loads when opened
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## OptionalDeps: Goblinomics_Vault, Goblinomics_Ledger, Goblinomics_Workshop, Goblinomics_Gatherer
+## LoadOnDemand: 1
+## SavedVariables: GoblinomicsInsightsDB
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Insights.lua
+Data.lua
+Sankey.lua
+InsightsUI.lua

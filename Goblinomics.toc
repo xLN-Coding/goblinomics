@@ -1,0 +1,95 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r
+## Notes: Track. Analyze. Profit. Make Gallywix Jealous.
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## SavedVariables: GoblinomicsDB
+## OptionalDeps: TradeSkillMaster, Auctionator, CraftSim
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+## AddonCompartmentFunc: Goblinomics_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: Goblinomics_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: Goblinomics_OnAddonCompartmentLeave
+## X-Curse-Project-ID: 0
+## X-License: MIT
+
+# Pre-12.1 client failsafe -- MUST load first (arms the per-file guard line)
+Core\ClientGate.lua
+
+# Libraries (bundled; only the core loads them, modules rely on LibStub)
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
+Libs\LibDeflate\LibDeflate.lua
+Libs\LibSerialize\LibSerialize.lua
+
+# Core foundation
+Core\Init.lua
+Core\Locale.lua
+
+# Locales (tables register at load, activation happens at ADDON_LOADED)
+Locales\enUS.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\esMX.lua
+Locales\itIT.lua
+Locales\ptBR.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
+
+# Utilities (pure Lua, covered by busted)
+Core\Util\ChatPattern.lua
+Core\Util\ItemKey.lua
+Core\Util\RingBuffer.lua
+Core\Util\Money.lua
+
+# Runtime
+Core\Perf.lua
+Core\Events.lua
+Core\Bus.lua
+Core\Timer.lua
+Core\DB.lua
+Core\Modules.lua
+
+# Tracking (services start on the first subscriber of their bus event)
+Core\Restriction.lua
+Core\Context.lua
+Core\Tracking\Money.lua
+Core\Tracking\Loot.lua
+Core\Tracking\Binding.lua
+Core\Tracking\Bags.lua
+
+# Pricing
+Core\Price.lua
+Core\Sources\Vendor.lua
+Core\Value.lua
+
+Core\Debug.lua
+
+# UI kit and shell (frames are built on first open)
+Core\UI\UI.lua
+Core\UI\Theme.lua
+Core\UI\Format.lua
+Core\UI\Widgets.lua
+Core\UI\Charts.lua
+Core\UI\Components.lua
+Core\UI\Periods.lua
+Core\UI\Sounds.lua
+Core\UI\Form.lua
+Core\UI\ItemMarks.lua
+Core\UI\Shell.lua
+Core\UI\Dashboard.lua
+Core\UI\Settings.lua
+Core\UI\PricingSettings.lua
+Core\UI\Toast.lua
+Core\UI\Setup.lua
+
+# Entry points and lifecycle driver
+Core\EntryPoints.lua
+Core\Bootstrap.lua

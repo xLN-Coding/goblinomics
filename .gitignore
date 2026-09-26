@@ -1,0 +1,11 @@
+# Packager output (tools/package.sh builds into release/)
+.release/
+release/
+
+# IDE / tooling
+.idea/
+.vscode/
+.luarocks/
+*.bak
+*.swp
+.DS_Store

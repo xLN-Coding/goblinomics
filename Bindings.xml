@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="GOBLINOMICS_TOGGLE" header="GOBLINOMICS" category="BINDING_CATEGORY_GOBLINOMICS">
+		Goblinomics.API.v1.UI:Toggle()
+	</Binding>
+</Bindings>

@@ -1,0 +1,18 @@
+describe("UI side panel and tooltip providers", function()
+    it("registers a side panel without creating frames", function()
+        local ns = load_core({ login = true, money = 1 })
+        local before = #WoWMock.frames
+        ns.API.UI:RegisterSidePanel({ id = "jealousmeter", width = 110, build = function() end })
+        assert.equals(before, #WoWMock.frames)
+        assert.equals("jealousmeter", ns.UI.GetSidePanel().id)
+    end)
+
+    it("adds provider lines to the entry point tooltip and isolates errors", function()
+        local ns = load_core({ login = true, money = 1 })
+        ns.API.UI:RegisterTooltipProvider("broken", function() error("x") end)
+        ns.API.UI:RegisterTooltipProvider("vault", function(tt) tt:AddLine("Gallywix: Envious") end)
+        ns.EntryPoints.FillTooltip(GameTooltip)
+        assert.truthy(table.concat(GameTooltip.lines, "\n"):find("Gallywix: Envious", 1, true))
+        assert.equals(1, #WoWMock.errors)
+    end)
+end)

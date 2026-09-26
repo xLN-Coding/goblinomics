@@ -1,0 +1,11 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r TSM Connector
+## Notes: Price source: market, destroy and sale rate via TSM_API
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics, TradeSkillMaster
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+TSM.lua

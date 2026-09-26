@@ -1,0 +1,50 @@
+name: Bug report
+description: Something is broken, wrong or throws a Lua error.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The more of this you can fill in, the faster I can fix it.
+        If you're not sure it's a bug, the [FAQ](https://github.com/xLN-Coding/goblinomics/wiki/FAQ) might already have the answer.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did you get instead?
+      placeholder: I sold a stack of ore on the AH, took the gold from the mailbox, and the Ledger booked it as Mail.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Lua error
+      description: If there was an error, paste the full text. BugSack (or /console scriptErrors 1) shows it.
+      render: text
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of /gob status
+      description: Type /gob status in chat and paste what it prints.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: prices
+    attributes:
+      label: Price addons
+      description: Which price addons are installed, with versions?
+      placeholder: TSM 4.14.x, Auctionator 300
+  - type: dropdown
+    id: language
+    attributes:
+      label: Client language
+      options:
+        - English
+        - Deutsch
+        - Other
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else?
+      description: Screenshots, whether it happens every time, other addons that might be involved. For stutters, the output of /gob perf helps a lot.

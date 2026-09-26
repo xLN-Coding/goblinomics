@@ -1,0 +1,36 @@
+name: Package and Release
+
+# Only version tags upload (v0.9.0-beta, v1.0.0); the packager picks the CurseForge
+# channel from the tag (-alpha, -beta, else release). Push tags one by one:
+# `git push origin v0.9.0-beta`, never `--tags` (old local tags must stay local).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      args:
+        description: Extra packager arguments (default -d builds without uploading)
+        default: "-d"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: BigWigsMods/packager@v2
+        with:
+          args: ${{ github.event_name == 'workflow_dispatch' && inputs.args || '' }}
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
