@@ -1,9 +1,9 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Locales/ptBR.lua
--- Portuguese (Brazil). Filled by the CurseForge localization app when the packager builds a
--- release; empty in a development checkout, so English
--- is shown. Missing strings fall back to English.
+-- Brazilian Portuguese. No translations yet, so English is shown. Translations are welcome:
+-- the English text is the key, e.g. L["Settings"] = "...". Every key is listed in
+-- release/locale/enUS.lua after tools/locale-export.sh; Locales/deDE.lua shows the
+-- format. Missing strings fall back to English, and the language appears in the
+-- settings as soon as it has one translation.
 local _, ns = ...
 local L = ns.RegisterLocale("ptBR") -- luacheck: ignore 211
-
---@localization(locale="ptBR", format="lua_additive_table", handle-unlocalized="ignore")@

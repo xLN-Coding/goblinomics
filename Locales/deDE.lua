@@ -1,7 +1,6 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Locales/deDE.lua
--- German translations, maintained in the repository (the other languages come from
--- CurseForge). Keys are the English source text; `true` keeps English.
+-- German translations. Keys are the English source text; `true` keeps English.
 -- spec/locale/coverage_spec.lua fails when a key used in code is missing here.
 local _, ns = ...
 local L = ns.RegisterLocale("deDE")

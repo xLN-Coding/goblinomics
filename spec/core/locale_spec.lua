@@ -56,7 +56,7 @@ describe("Core/Locale", function()
         assert.equals("deDE", ns.Locale.GetActive())
     end)
 
-    it("offers and uses a CurseForge language only once it has translations", function()
+    it("offers and uses a language only once it has translations", function()
         local ns = load_core()
         local function has(code)
             for _, c in ipairs(ns.Locale.Choices()) do if c.value == code then return true end end

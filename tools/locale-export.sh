@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Export the phrases for the CurseForge localization app into release/locale/
+# Export every phrase (and the German example) for translators into release/locale/
 # Runs Lua 5.1 in the project's Docker image.
 set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

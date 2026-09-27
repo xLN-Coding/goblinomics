@@ -5,10 +5,9 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- the effective locale (settings override or client locale) is activated at the
 -- core's ADDON_LOADED, when SavedVariables are available. A value of `true`
 -- means "keep the English text". All strings of all modules live in the core's
--- Locales/ folder. German is maintained in the repository; every other WoW
--- language is filled by the CurseForge localization app when the packager
--- builds a release. The language setting offers only
--- languages that have translations; missing strings fall back to English.
+-- Locales/ folder, one file per WoW language, all maintained in the repository.
+-- The language setting offers only languages that have translations; missing
+-- strings fall back to English.
 local _, ns = ...
 
 local Locale = {}
@@ -67,7 +66,7 @@ function Locale.HasTranslations(code)
 end
 
 --- Effective locale: the setting, else the client language; languages without
--- any translation (not yet translated on CurseForge) resolve to English.
+-- any translation resolve to English.
 local function Resolve(override)
     if type(override) == "string" and SUPPORTED[override] and Locale.HasTranslations(override) then
         return override

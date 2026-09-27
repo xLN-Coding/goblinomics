@@ -1,8 +1,7 @@
 -- tools/locale_export.lua (run by tools/locale-export.sh, Lua 5.1)
--- Writes the phrases for the CurseForge localization app into release/locale/:
---   enUS.lua  every key used in the code, L["..."] = true (import as the base language)
---   deDE.lua  the German translations from Locales/deDE.lua (import to keep CurseForge in sync)
--- Format: lua_additive_table, the format the locale files' packager markers request.
+-- Writes the phrases for translators into release/locale/:
+--   enUS.lua  every key used in the code, L["..."] = true (the list to translate)
+--   deDE.lua  the German translations from Locales/deDE.lua (a filled example)
 local function Files()
     local list = {}
     local p = io.popen('find Core Modules Connectors -name "*.lua" | sort')

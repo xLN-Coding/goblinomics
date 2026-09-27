@@ -70,15 +70,15 @@ tools/link-dev.sh        # symlink the addon folders into your AddOns directory
 tools/test.sh            # busted specs, Lua 5.1 in Docker
 tools/lint.sh            # luacheck
 tools/package.sh         # build a release zip into release/ without uploading
-tools/locale-export.sh   # phrases for the CurseForge translation tool
+tools/locale-export.sh   # every phrase as a list for translators
 ```
 
 `link-dev.sh` guesses the AddOns path. If yours is somewhere else, set
 `WOW_ADDONS=/path/to/Interface/AddOns`. Tests and lint only need Docker.
 
 Other addons can read Goblinomics data through `Goblinomics.API.v1`. The wiki has
-a page for addon authors. Translations go through CurseForge; see the
-"Translating" page in the wiki.
+a page for addon authors. Translations are welcome as pull requests against
+`Locales/`; the "Translating" page in the wiki explains how.
 
 ## License
 

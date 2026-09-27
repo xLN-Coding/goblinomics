@@ -28,11 +28,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # -l skips the CurseForge translations until the project's localization is
-      # enabled (German ships in the repository); remove it once phrases are imported.
       - uses: BigWigsMods/packager@v2
         with:
-          args: -l ${{ github.event_name == 'workflow_dispatch' && inputs.args || '' }}
+          args: ${{ github.event_name == 'workflow_dispatch' && inputs.args || '' }}
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
