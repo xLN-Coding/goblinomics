@@ -4,7 +4,8 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- BAG_UPDATE marks a bag dirty and schedules a scan for the next frame (on Retail
 -- BAG_UPDATE_DELAYED does not fire for every bag). Slots whose item info is not
 -- loaded yet, or that report count 0 (item going away), keep their old state and
--- the bag is rescanned shortly after. Scans wait for combat end and for the end
+-- the bag is rescanned shortly after; a slot whose bind type is not known yet is
+-- rescanned when the item data arrives. Scans wait for combat end and for the end
 -- of the restricted mode. Positive deltas are netted against loot claims; the
 -- rest is emitted. No delta is emitted until one complete baseline scan exists.
 local _, ns = ...
@@ -62,7 +63,9 @@ local function ScanBag(bag, deltas)
         local key, count, bound = nil, 0, nil
         if info then
             count = info.stackCount or 0
-            bound = ns.Binding.IsBound(info, bag, slot) or nil
+            local isBound, unknownID = ns.Binding.IsBound(info, bag, slot)
+            bound = isBound or nil
+            if unknownID then ns.Binding.Await(OWNER, unknownID) end
             local link = info.hyperlink
             if count == 0 or not info.itemID or not link then
                 complete = false
@@ -179,6 +182,14 @@ local function MarkAllDirty()
     end
 end
 
+-- A slot whose bind type was unknown is scanned again once the item data is loaded.
+ns.Binding.OnKnown(OWNER, function()
+    if carried and Bus.IsServiceActive("bags") then
+        MarkAllDirty()
+        Schedule()
+    end
+end)
+
 Restriction.OnLeave(function()
     if Bus.IsServiceActive("bags") then
         Flush()
@@ -214,6 +225,9 @@ ns.API.Bags = {
     HasBaseline = function() return Bags.HasBaseline() end,
     IsBound = function(_, info, bag, slot) return ns.Binding.IsBound(info, bag, slot) end,
     IsWarboundType = function(_, item) return ns.Binding.IsWarboundType(item) end,
+    WarboundState = function(_, item) return ns.Binding.WarboundState(item) end,
+    AwaitBindType = function(_, itemID, owner) return ns.Binding.Await(owner, itemID) end,
+    OnBindTypeKnown = function(_, owner, fn) return ns.Binding.OnKnown(owner, fn) end,
 }
 
 Bus.DefineService("bags", {

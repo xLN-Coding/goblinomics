@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Warbound items could count towards your wealth when the game hadn't loaded
+  their data yet during a scan, typically in the warband bank right after
+  logging in. Goblinomics now waits for the data and corrects the bank, warband
+  bank and mailbox figures on its own, without another visit. Older saved
+  figures are checked once when you log in.
+
 ## [0.9.0-beta] - 2026-09-26
 
 The first public beta. Everything is new, so here's a tour instead of a diff.

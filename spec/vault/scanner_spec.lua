@@ -3,10 +3,11 @@ local SWORD = "|cffa335ee|Hitem:500::::::::80:::::|h[Sword]|h|r"
 local HERB = "|cffffffff|Hitem:2447::::::::80:::::|h[Peacebloom]|h|r"
 
 describe("Vault: scanner", function()
-    local char, root
+    local char, root, vns
 
     before_each(function()
-        load_vault({
+        local _
+        _, vns = load_vault({
             money = 123456,
             before = function()
                 WoWMock.bags[0] = { numSlots = 2, [1] = { itemID = 2589, hyperlink = LINEN, stackCount = 20 } }
@@ -55,6 +56,34 @@ describe("Vault: scanner", function()
         WoWMock.advance(0.5)
         WoWMock.flush()
         assert.equals(40, char.locations.bank.items["i:2447"])
+    end)
+
+    it("corrects a warband snapshot when the bind type of an item arrives after the scan", function()
+        local WB = "|cffffffff|Hitem:777::::::::80:::::|h[Warbound]|h|r"
+        WoWMock.bags[13] = { numSlots = 1, [1] = { itemID = 777, hyperlink = WB, stackCount = 4 } }
+        WoWMock.fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", Enum.PlayerInteractionType.Banker)
+        WoWMock.flush()
+        assert.equals(4, root.warband.items["i:777"])
+        assert.is_nil(root.warband.bound["i:777"])
+        WoWMock.fire("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", Enum.PlayerInteractionType.Banker)
+        WoWMock.items[777] = { bindType = 8 }
+        WoWMock.fire("GET_ITEM_INFO_RECEIVED", 777, true)
+        WoWMock.advance(1)
+        WoWMock.flush()
+        assert.equals(4, root.warband.bound["i:777"])
+    end)
+
+    it("repairs stored snapshots at enable when an item turns out to be warbound", function()
+        WoWMock.items[778] = { bindType = 7 }
+        WoWMock.items[779] = { bindType = 0 }
+        root.warband.items = { ["i:778"] = 3, ["i:779"] = 5 }
+        root.warband.bound = {}
+        char.locations.mail = { items = { ["i:778"] = 1 }, bound = {}, seenAt = time() }
+        vns.Scanner.ResolveBindings()
+        WoWMock.flush()
+        assert.equals(3, root.warband.bound["i:778"])
+        assert.is_nil(root.warband.bound["i:779"])
+        assert.equals(1, char.locations.mail.bound["i:778"])
     end)
 
     it("keeps the warband snapshot without the account inventory lock", function()

@@ -8,6 +8,10 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 --   auctions   active owned auctions (sold ones arrive as mail gold)
 --   equipment  equipped items, all bound
 -- plus the gold of the character and of the warband. Container scans run as jobs.
+-- Warbound items whose data was not loaded during a scan count as tradable at
+-- first; once the client knows their bind type, stored bank, warband and mail
+-- snapshots are corrected without visiting the bank again. At enable every
+-- stored snapshot is checked this way, which also repairs older ones.
 local _, ns = ...
 
 local Scanner = {}
@@ -17,9 +21,11 @@ local API = ns.API
 local ItemKey = API.ItemKey
 
 local WOW_TOKEN = 122284
+local BIND_OWNER = "Goblinomics_Vault.Scanner"
 local vault
 local bankOpen, mailOpen = false, false
 local pending = {}   -- debounce flags per location
+local knownIDs = {}  -- item ids whose bind type arrived since the last check
 
 local BANK_BAGS, WARBAND_BAGS = {}, {}
 
@@ -80,7 +86,9 @@ local function ScanContainers(bags)
                 local key = ItemKey.FromLink(info.hyperlink)
                 if key then
                     Add(items, key, info.stackCount)
-                    if API.Bags:IsBound(info, bag, slot) then Add(bound, key, info.stackCount) end
+                    local isBound, unknownID = API.Bags:IsBound(info, bag, slot)
+                    if isBound then Add(bound, key, info.stackCount) end
+                    if unknownID then API.Bags:AwaitBindType(unknownID, BIND_OWNER) end
                 end
             end
         end
@@ -179,7 +187,12 @@ local function ScanMail()
                         if key then
                             Add(items, key, n)
                             -- warbound items can be mailed between own characters
-                            if API.Bags:IsWarboundType(link) then Add(bound, key, n) end
+                            local warbound = API.Bags:WarboundState(link)
+                            if warbound then Add(bound, key, n) end
+                            if warbound == nil then
+                                local id = ItemKey.ToItemID(key)
+                                if id then API.Bags:AwaitBindType(id, BIND_OWNER) end
+                            end
                         end
                     end
                 end
@@ -277,6 +290,58 @@ local function OnMoney(_, payload)
     Changed()
 end
 
+-- Bind types that arrive later ------------------------------------------------------
+-- Stored snapshots that can hold warbound items (bags are rescanned by the core).
+local function EachSnapshot(fn)
+    local root = vault.db.root
+    for _, c in pairs(root.chars or {}) do
+        local locs = type(c) == "table" and c.locations
+        if type(locs) == "table" then
+            for _, id in ipairs({ "bank", "mail" }) do
+                if type(locs[id]) == "table" then fn(locs[id]) end
+            end
+        end
+    end
+    if type(root.warband) == "table" then fn(root.warband) end
+end
+
+--- Marks the units of warbound items as bound. ids: set of item ids to check, or
+-- nil for every item; items without loaded data are awaited.
+function Scanner.ResolveBindings(ids)
+    vault:RunJob("resolveBindings", function()
+        local changed, count = false, 0
+        EachSnapshot(function(loc)
+            if type(loc.items) ~= "table" then return end
+            for key, n in pairs(loc.items) do
+                local id = ItemKey.ToItemID(key)
+                if id and (ids == nil or ids[id]) and (loc.bound and loc.bound[key] or 0) < n then
+                    local warbound = API.Bags:WarboundState(id)
+                    if warbound then
+                        loc.bound = loc.bound or {}
+                        loc.bound[key] = n
+                        changed = true
+                    elseif warbound == nil then
+                        API.Bags:AwaitBindType(id, BIND_OWNER)
+                    end
+                end
+                count = count + 1
+                if count % 100 == 0 then API.Yield() end
+            end
+        end)
+        if changed then Changed() end
+    end)
+end
+
+local function OnBindTypeKnown(itemID)
+    if not vault then return end
+    knownIDs[itemID] = true
+    Debounce("bindings", 1, function()
+        local ids = knownIDs
+        knownIDs = {}
+        Scanner.ResolveBindings(ids)
+    end)
+end
+
 -- Interaction windows ------------------------------------------------------------
 local interactionKind = {}
 
@@ -317,18 +382,21 @@ function Scanner.Enable(module)
     module:RegisterEvent("OWNED_AUCTIONS_UPDATED", function() Debounce("auctions", 0.5, ScanAuctions) end)
     module:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function() Debounce("equipment", 1, ScanEquipment) end)
 
+    API.Bags:OnBindTypeKnown(BIND_OWNER, OnBindTypeKnown)
     Scanner.ReadGold()
     Scanner.UpdateWarbandGold()
     ScanEquipment()
     module:After(5, ScanEquipment)   -- item links can be missing right after login
     bagAttempts = 0
     WaitForBags()
+    Scanner.ResolveBindings()
 end
 
 function Scanner.Disable()
     goldAttempts = 0
     bankOpen, mailOpen = false, false
     for k in pairs(pending) do pending[k] = nil end
+    knownIDs = {}
 end
 
 function Scanner.OnLogout()
