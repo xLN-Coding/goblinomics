@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.1-beta] - 2026-09-28
 
 ### Added
 - The Vault tab shows what your wealth is made of. Click a character or the
