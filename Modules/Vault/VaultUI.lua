@@ -2,7 +2,10 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Vault/VaultUI.lua
 -- Vault tab (alt overview with freshness per location, one wealth figure with
 -- the speculative part), the wealth tooltip and the "Vault" settings section.
--- The dashboard cards live in Cards.lua.
+-- A click on a character or the warband bank expands its items (Holdings.lua):
+-- icon, link, quantity, where they lie and their value, the most valuable
+-- first; hover shows the item tooltip with the split per location, shift-click
+-- links it. The dashboard cards live in Cards.lua.
 local _, ns = ...
 
 local VUI = {}
@@ -20,12 +23,17 @@ local function LocationName(id)
     if id == "bank" then return L["Bank"] end
     if id == "mail" then return L["Mail"] end
     if id == "auctions" then return L["Auctions"] end
+    if id == "warband" then return L["Warband bank"] end
     return L["Equipment"]
 end
 local OWNER_TAB = "Goblinomics_Vault.Tab"
+local ITEMS_SHOWN = 50   -- items per expanded row before "more items"
 
 local vault
 local tab = {}      -- widgets of the tab page
+local expanded = {} -- ownerKey -> true (character key or "warband")
+local showAll = {}  -- ownerKey -> true once "more items" was clicked
+VUI.expanded, VUI.showAll = expanded, showAll
 
 local function Fmt(copper)
     return Money.Format(copper or 0, { abbreviate = true })
@@ -52,6 +60,41 @@ end
 
 local function Pct(v) return API.Format:Percent(v) end
 
+local function ItemLink(key)
+    local id = tonumber(key:match("^i:(%d+)"))
+    if not id then return nil end
+    local name, link = C_Item.GetItemInfo(id)
+    return link, name
+end
+
+--- Flat list rows: each owner row, followed by its items while it is expanded
+-- (the ITEMS_SHOWN most valuable, then a "more" row), or a "loading" row while
+-- its items are computed. get(ownerKey) returns the Holdings result or nil.
+function VUI.BuildRows(owners, get)
+    local out = {}
+    for _, row in ipairs(owners) do
+        row.kind = "owner"
+        out[#out + 1] = row
+        if expanded[row.key] then
+            local h = get(row.key)
+            if not h then
+                out[#out + 1] = { kind = "loading", owner = row.key }
+            elseif #h.items == 0 then
+                out[#out + 1] = { kind = "empty", owner = row.key }
+            else
+                local limit = showAll[row.key] and #h.items or math.min(#h.items, ITEMS_SHOWN)
+                for i = 1, limit do out[#out + 1] = { kind = "item", owner = row.key, entry = h.items[i] } end
+                if limit < #h.items then
+                    local rest = 0
+                    for i = limit + 1, #h.items do rest = rest + h.items[i].value end
+                    out[#out + 1] = { kind = "more", owner = row.key, count = #h.items - limit, value = rest }
+                end
+            end
+        end
+    end
+    return out
+end
+
 local function LocationTooltip(owner, row)
     local W = API.Widgets
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
@@ -73,6 +116,101 @@ local function LocationTooltip(owner, row)
 end
 
 local columns   -- Widgets.Columns, built with the tab
+local RefreshTab
+
+local function ItemTooltip(owner, entry)
+    local W = API.Widgets
+    local link = ItemLink(entry.key)
+    if link then
+        W.ShowItemTooltip(owner, link)
+    else
+        GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+        W.TooltipTitle(entry.key)
+    end
+    GameTooltip:AddLine(" ")
+    for _, loc in ipairs(entry.locations) do
+        local where = LocationName(loc.location)
+        if loc.state == "stale" then where = where .. " " .. Freshness.Colorize("stale", "(" .. Freshness.Label("stale") .. ")") end
+        W.TooltipPair(where, API.Money.Group(loc.quantity) .. "  " .. Fmt(loc.value))
+    end
+    GameTooltip:Show()
+end
+
+local function Toggle(ownerKey)
+    if expanded[ownerKey] then
+        expanded[ownerKey], showAll[ownerKey] = nil, nil
+    else
+        expanded[ownerKey] = true
+        ns.Holdings.Run(ownerKey, function() RefreshTab() end)
+    end
+    RefreshTab()
+end
+
+local function OnRowClick(self)
+    local d = self.data
+    if d.kind == "owner" then
+        Toggle(d.key)
+    elseif d.kind == "more" then
+        showAll[d.owner] = true
+        RefreshTab()
+    elseif d.kind == "item" then
+        local link = ItemLink(d.entry.key)
+        if link and IsModifiedClick and IsModifiedClick() and HandleModifiedItemClick then HandleModifiedItemClick(link) end
+    end
+end
+
+local function OnRowEnter(self)
+    local d = self.data
+    if d.kind == "owner" then
+        LocationTooltip(self, d)
+    elseif d.kind == "item" then
+        ItemTooltip(self, d.entry)
+    end
+end
+
+local function ClearCells(cells)
+    for _, key in ipairs({ "name", "gold", "items", "wealth", "locations", "seen" }) do cells[key]:SetText("") end
+end
+
+-- Item, "more", "loading" and "empty" rows below an expanded owner.
+local function InitDetailRow(row, data)
+    local Theme = API.Theme
+    local C = Theme.colors
+    local cells = row.cells
+    ClearCells(cells)
+    row.zebra:Hide()
+    row.toggle:SetText("")
+    if data.kind == "item" then
+        local e = data.entry
+        local id = tonumber(e.key:match("^i:(%d+)"))
+        row.icon:SetTexture(id and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or 134400)
+        row.icon:Show()
+        API.ItemMarks:Update(row, e.key)
+        row.label:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+        local link, name = ItemLink(e.key)
+        row.label:SetText((link or name or e.key) .. "  " .. Theme.Colorize("x" .. API.Money.Group(e.quantity), C.textDim))
+        local names, stale = {}, false
+        for _, loc in ipairs(e.locations) do
+            names[#names + 1] = LocationName(loc.location)
+            if loc.state == "stale" then stale = true end
+        end
+        cells.locations:SetText(Theme.Colorize(table.concat(names, ", "), stale and C.textDim or C.text))
+        cells.wealth:SetText(Theme.Colorize(Fmt(e.value), C.gold))
+    else
+        row.icon:Hide()
+        API.ItemMarks:Update(row, nil)
+        row.label:SetPoint("LEFT", 32, 0)
+        local text
+        if data.kind == "more" then
+            text = API.Lf("%d more items (%s), click to show all", data.count, Fmt(data.value))
+        elseif data.kind == "loading" then
+            text = L["Calculating..."]
+        else
+            text = L["No items that count towards the wealth."]
+        end
+        row.label:SetText(Theme.Colorize(text, C.textDim))
+    end
+end
 
 local function InitRow(row, data)
     local Theme = API.Theme
@@ -80,21 +218,42 @@ local function InitRow(row, data)
     if not row.cells then
         columns:Cells(row)
         API.Widgets.RowBackground(row)
-        row:SetScript("OnEnter", function(self) LocationTooltip(self, self.data) end)
+        row.toggle = Theme.Text(row, "body", C.textDim)
+        row.toggle:SetPoint("LEFT", 2, 0)
+        row.icon = row:CreateTexture(nil, "ARTWORK")
+        row.icon:SetSize(16, 16)
+        row.icon:SetPoint("LEFT", 32, 0)
+        API.ItemMarks:Attach(row, row.icon, 10)
+        row.label = Theme.Text(row, "body", C.text)
+        row.label:SetWordWrap(false)
+        row:SetScript("OnClick", OnRowClick)
+        row:SetScript("OnEnter", OnRowEnter)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
     row.data = data
     local cells = row.cells
+    row.label:ClearAllPoints()
+    row.label:SetPoint("RIGHT", cells.gold, "LEFT", -Theme.space.SM, 0)
+    if data.kind ~= "owner" then
+        InitDetailRow(row, data)
+        return
+    end
+    row.zebra:Show()
+    row.icon:Hide()
+    API.ItemMarks:Update(row, nil)
+    row.toggle:SetText(expanded[data.key] and "-" or "+")
+    row.label:SetPoint("LEFT", 14, 0)
+    cells.name:SetText("")
     if data.warband then
         local w = data.warband
-        cells.name:SetText(Theme.Colorize(L["Warband bank"], C.gold))
+        row.label:SetText(Theme.Colorize(L["Warband bank"], C.gold))
         cells.gold:SetText(Fmt(w.gold))
         cells.items:SetText(Fmt(w.items + w.auctions))
         cells.wealth:SetText(Fmt(w.wealth))
         cells.locations:SetText(Freshness.Colorize(w.state, "W"))
     else
         local c = data.char
-        cells.name:SetText("|c" .. ClassColor(c.class) .. c.name .. "|r")
+        row.label:SetText("|c" .. ClassColor(c.class) .. c.name .. "|r")
         cells.gold:SetText(Fmt(c.gold))
         cells.items:SetText(Fmt(c.items + c.auctions))
         cells.wealth:SetText(Fmt(c.wealth))
@@ -108,7 +267,7 @@ local function InitRow(row, data)
     cells.seen:SetText(Freshness.Age(data.last))
 end
 
-local function RefreshTab()
+RefreshTab = function()
     local result = ns.Networth.Get()
     if not tab.list or not result then return end
     local Theme = API.Theme
@@ -119,7 +278,13 @@ local function RefreshTab()
         L["Wealth"], Fmt(result.wealth), speculative,
         L["Gold"], Fmt(result.gold), L["Auctions"], Fmt(result.auctions), L["Items"], Fmt(result.items),
         Theme.Colorize(L["Confidence"] .. " " .. Pct(result.confidence), Theme.colors.textDim)))
-    tab.list:SetData(Rows(result))
+    tab.list:SetData(VUI.BuildRows(Rows(result), ns.Holdings.Get))
+end
+
+-- New networth: the expanded rows compute their items again.
+local function OnNetworth()
+    for ownerKey in pairs(expanded) do ns.Holdings.Run(ownerKey, function() RefreshTab() end) end
+    RefreshTab()
 end
 
 local function BuildTab(page)
@@ -228,8 +393,8 @@ function VUI.Enable(module)
         id = "vault", title = function() return L["Vault"] end, order = 10,
         build = BuildTab,
         onShow = function()
-            RefreshTab()
-            API.On("NETWORTH_UPDATED", RefreshTab, OWNER_TAB)
+            OnNetworth()
+            API.On("NETWORTH_UPDATED", OnNetworth, OWNER_TAB)
         end,
         onHide = function() API.Off("NETWORTH_UPDATED", OWNER_TAB) end,
     })

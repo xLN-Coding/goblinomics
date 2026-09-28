@@ -16,6 +16,7 @@ Remote.lua
 Networth.lua
 Jealousmeter.lua
 JealousmeterUI.lua
+Holdings.lua
 VaultUI.lua
 Speculative.lua
 SpeculativeUI.lua

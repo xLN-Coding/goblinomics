@@ -79,13 +79,14 @@ function Vault:OnEnable()
     c.class = select(2, UnitClass("player"))
     c.name = UnitName("player")
     if type(c.locations) ~= "table" then c.locations = {} end
-    for _, part in ipairs({ "Scanner", "Networth", "JealousmeterUI", "VaultUI", "Speculative", "SpeculativeUI", "VaultCards", "Goals" }) do
+    for _, part in ipairs({ "Scanner", "Networth", "Holdings", "JealousmeterUI", "VaultUI", "Speculative", "SpeculativeUI",
+        "VaultCards", "Goals" }) do
         if ns[part] and ns[part].Enable then ns[part].Enable(self) end
     end
 end
 
 function Vault:OnDisable()
-    for _, part in ipairs({ "Goals", "JealousmeterUI", "Networth", "Scanner" }) do
+    for _, part in ipairs({ "Goals", "JealousmeterUI", "Holdings", "Networth", "Scanner" }) do
         if ns[part] and ns[part].Disable then ns[part].Disable(self) end
     end
 end

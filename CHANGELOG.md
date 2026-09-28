@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added
+- The Vault tab shows what your wealth is made of. Click a character or the
+  warband bank and its items unfold below it, the most valuable first, with
+  quantity, where they lie and what they're worth. Hover an item to see how it
+  splits across bags, bank, mail and auctions; shift-click links it.
+
+### Changed
+- Speculative items need a sale rate, and only TSM has one. Without TSM the
+  Speculative tab, the speculative share in the wealth and the related settings
+  are hidden now instead of showing zero. Install TSM and they come back.
+
 ### Fixed
 - Warbound items could count towards your wealth when the game hadn't loaded
   their data yet during a scan, typically in the warband bank right after
