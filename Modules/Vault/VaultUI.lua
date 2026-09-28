@@ -112,9 +112,11 @@ local function RefreshTab()
     local result = ns.Networth.Get()
     if not tab.list or not result then return end
     local Theme = API.Theme
-    tab.summary:SetText(("%s %s  %s   %s %s   %s %s   %s %s   %s"):format(
-        L["Wealth"], Fmt(result.wealth),
-        Theme.Colorize("(" .. L["of which speculative"] .. " " .. Fmt(result.speculative) .. ")", Theme.colors.textDim),
+    local speculative = API.Price:HasRole("saleRate")
+        and ("  " .. Theme.Colorize("(" .. L["of which speculative"] .. " " .. Fmt(result.speculative) .. ")",
+            Theme.colors.textDim)) or ""
+    tab.summary:SetText(("%s %s%s   %s %s   %s %s   %s %s   %s"):format(
+        L["Wealth"], Fmt(result.wealth), speculative,
         L["Gold"], Fmt(result.gold), L["Auctions"], Fmt(result.auctions), L["Items"], Fmt(result.items),
         Theme.Colorize(L["Confidence"] .. " " .. Pct(result.confidence), Theme.colors.textDim)))
     tab.list:SetData(Rows(result))
@@ -162,10 +164,12 @@ local TIPS = {
         Line(L["Gold"], Fmt(r.gold))
         Line(L["Auctions"], Fmt(r.auctions))
         Line(L["Items"], Fmt(r.items))
-        GameTooltip:AddLine(" ")
-        Explain(L["Speculative: items with a sale rate below %s; counted, but they rarely sell."]
-            :format(Pct(cfg.speculativeThreshold)))
-        Line(L["of which speculative"], Fmt(r.speculative))
+        if API.Price:HasRole("saleRate") then   -- speculative needs a sale rate (TSM)
+            GameTooltip:AddLine(" ")
+            Explain(L["Speculative: items with a sale rate below %s; counted, but they rarely sell."]
+                :format(Pct(cfg.speculativeThreshold)))
+            Line(L["of which speculative"], Fmt(r.speculative))
+        end
         if r.remote then
             GameTooltip:AddLine(" ")
             Line(L["Other accounts"], Fmt(r.remote.wealth))

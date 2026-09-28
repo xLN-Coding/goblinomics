@@ -84,21 +84,35 @@ local function ResetChains()
     for role in pairs(chains) do chains[role] = nil end
 end
 
+--- Does any registered source provide this role (e.g. "saleRate", only TSM)?
+function Price.HasRole(role)
+    return #Price.Chain(role) > 0
+end
+
+-- The UI hides what needs a sale rate (speculative items) while no source has one.
+local function SourcesChanged(hadSaleRate)
+    ResetChains()
+    Price.Invalidate()
+    if hadSaleRate ~= Price.HasRole("saleRate") and ns.UI and ns.UI.VisibilityChanged then
+        ns.UI.VisibilityChanged()
+    end
+end
+
 --- src = { id, name, priority, roles = {market = true, ...}, Get(self, key, role), Status(self) }
 function Price.RegisterSource(src)
     if type(src) ~= "table" or type(src.id) ~= "string" or type(src.Get) ~= "function" or type(src.roles) ~= "table" then
         error("Goblinomics Price:RegisterSource: source needs id, roles and Get", 3)
     end
+    local had = Price.HasRole("saleRate")
     sources[src.id] = src
-    ResetChains()
-    Price.Invalidate()
+    SourcesChanged(had)
 end
 
 function Price.UnregisterSource(id)
     if sources[id] then
+        local had = Price.HasRole("saleRate")
         sources[id] = nil
-        ResetChains()
-        Price.Invalidate()
+        SourcesChanged(had)
     end
 end
 
@@ -178,4 +192,5 @@ ns.API.Price = {
     Sources = function() return Price.Sources() end,
     Config = function() return Price.Config() end,
     GetSource = function(_, id) return Price.GetSource(id) end,
+    HasRole = function(_, role) return Price.HasRole(role) end,
 }

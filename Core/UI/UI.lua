@@ -28,8 +28,15 @@ local function Owner(spec)
     if spec.module == nil and ns.Modules then spec.module = ns.Modules.current end
 end
 
+--- A registration is shown while its module is enabled and its optional
+-- visible() predicate (e.g. "a sale rate source exists") returns true.
 function UI.IsActive(spec)
-    return spec ~= nil and (not spec.module or not ns.Modules or ns.Modules.IsEnabled(spec.module))
+    if spec == nil or (spec.module and ns.Modules and not ns.Modules.IsEnabled(spec.module)) then return false end
+    if spec.visible then
+        local ok, shown = ns.SafeCall(spec.visible)
+        return ok and shown ~= false and shown ~= nil
+    end
+    return true
 end
 
 local function Sorted(map, filter)
@@ -118,6 +125,12 @@ function UI.ModuleStateChanged(id, enabled)
     for _, name in ipairs({ "OnModuleTabs", "OnModuleWidgets", "OnModuleSettings", "OnModuleSidePanel" }) do
         if UI[name] then ns.SafeCall(UI[name], id, enabled) end
     end
+end
+
+--- A visible() predicate may have changed (e.g. TSM registered): same refresh.
+function UI.VisibilityChanged()
+    UI.ModuleStateChanged(nil, nil)
+    if UI.OnSettingsRebuild then ns.SafeCall(UI.OnSettingsRebuild) end
 end
 
 --- Titles may be strings or functions (core tabs translate at display time,

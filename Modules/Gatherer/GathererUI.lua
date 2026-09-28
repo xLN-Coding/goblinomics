@@ -123,9 +123,11 @@ local function RefreshSession()
         { L["Repair"], repair }, { L["Total"], CODE.gold .. Money(v.total) .. "|r" },
         { L["Realized"], Money(v.realized, { color = true }) }, { L["GPH"], gph },
     }
-    for i, cell in ipairs(cells) do
-        p.cells[i].label:SetText(cell[1])
-        p.cells[i].value:SetText(cell[2])
+    if not API.Price:HasRole("saleRate") then table.remove(cells, 4) end   -- speculative needs TSM
+    for i = 1, #p.cells do
+        local cell = cells[i]
+        p.cells[i].label:SetText(cell and cell[1] or "")
+        p.cells[i].value:SetText(cell and cell[2] or "")
     end
     for row = 1, 4 do
         local item = v.items[row]

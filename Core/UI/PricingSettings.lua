@@ -59,15 +59,17 @@ UI.RegisterSettings({
             end
         end
 
-        form:Group(L["Valuation"])
-        form:Slider({ label = L["Speculative below sale rate"],
-            description = L["Items that sell less often count as speculative: in the wealth, but shown separately."],
-            min = 0, max = 0.5, step = 0.01, format = Rate,
-            get = function() return cfg.speculativeThreshold end,
-            set = function(v)
-                cfg.speculativeThreshold = v
-                Price.Invalidate()
-            end })
+        if Price.HasRole("saleRate") then   -- speculative needs a sale rate (TSM)
+            form:Group(L["Valuation"])
+            form:Slider({ label = L["Speculative below sale rate"],
+                description = L["Items that sell less often count as speculative: in the wealth, but shown separately."],
+                min = 0, max = 0.5, step = 0.01, format = Rate,
+                get = function() return cfg.speculativeThreshold end,
+                set = function(v)
+                    cfg.speculativeThreshold = v
+                    Price.Invalidate()
+                end })
+        end
 
         form:Group(L["Price sources"])
         for _, src in ipairs(Price.Sources()) do

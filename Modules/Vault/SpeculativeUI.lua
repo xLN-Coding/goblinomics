@@ -345,6 +345,7 @@ end
 function SUI.Enable()
     API.UI:RegisterTab({
         id = "speculative", title = function() return L["Speculative items"] end, order = 15,
+        visible = function() return API.Price:HasRole("saleRate") end,   -- only TSM has a sale rate
         build = BuildTab,
         onShow = function()
             SUI.Refresh()

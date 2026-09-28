@@ -104,13 +104,14 @@ end
 
 --- Parts of the wealth for the bar: { { key, amount, share } } (other accounts when linked).
 function Cards.WealthParts(r)
-    local spec = math.min(r.speculative or 0, r.items or 0)
+    local withRate = API.Price:HasRole("saleRate")   -- speculative needs a sale rate (TSM)
+    local spec = withRate and math.min(r.speculative or 0, r.items or 0) or 0
     local parts = {
         { key = "gold", amount = r.gold or 0 },
         { key = "auctions", amount = r.auctions or 0 },
         { key = "items", amount = (r.items or 0) - spec },
-        { key = "speculative", amount = spec },
     }
+    if withRate then parts[#parts + 1] = { key = "speculative", amount = spec } end
     local other = (r.wealth or 0) - (r.gold or 0) - (r.auctions or 0) - (r.items or 0)
     if other > 0 then parts[#parts + 1] = { key = "other", amount = other } end
     local total = math.max(1, r.wealth or 0)

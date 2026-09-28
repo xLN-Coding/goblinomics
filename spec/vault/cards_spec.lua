@@ -57,7 +57,16 @@ describe("Vault: dashboard cards", function()
         assert.equals(5000000, list[1].gold)
     end)
 
+    it("shows no speculative part without a sale rate source", function()
+        local parts = vns.VaultCards.WealthParts({ wealth = 1000, gold = 500, auctions = 100, items = 400, speculative = 150 })
+        local by = {}
+        for _, p in ipairs(parts) do by[p.key] = p end
+        assert.is_nil(by.speculative)
+        assert.equals(400, by.items.amount)
+    end)
+
     it("splits the wealth for the bar and builds its history", function()
+        ns.Price.RegisterSource(fake("tsm", 10, { market = {}, saleRate = {} }))
         local parts = vns.VaultCards.WealthParts({ wealth = 1000, gold = 500, auctions = 100, items = 400, speculative = 150 })
         local by = {}
         for _, p in ipairs(parts) do by[p.key] = p end

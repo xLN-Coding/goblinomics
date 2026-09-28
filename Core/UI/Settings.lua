@@ -82,6 +82,16 @@ end
 UI.OnSettingsChanged = RefreshNav
 
 -- the section of a switched-off module disappears; if it was selected, General is shown
+--- Sections depend on what is available (e.g. a sale rate source): build them again.
+UI.OnSettingsRebuild = function()
+    if not page.panel then return end
+    for id, entry in pairs(page.built) do
+        entry.frame:Hide()
+        page.built[id] = nil
+    end
+    if page.selected then UI.SelectSettings(page.selected) end
+end
+
 UI.OnModuleSettings = function()
     if not page.panel then return end
     if page.selected and not UI.IsActive(UI.GetSettings(page.selected)) then
@@ -174,11 +184,13 @@ UI.RegisterSettings({
             get = function() return settings.sound.channel end,
             set = function(value) settings.sound.channel = value end })
 
-        form:Group(L["Bags"])
-        form:Toggle({ label = L["Mark speculative items in bags and bank"] .. " " .. ns.ItemMarks.INLINE,
-            description = L["Speculative items (sale rate below the threshold) get a small logo in the top-right corner."],
-            get = function() return settings.ui.markSpeculative ~= false end,
-            set = function(on) settings.ui.markSpeculative = on end })
+        if ns.Price.HasRole("saleRate") then   -- speculative needs a sale rate (TSM)
+            form:Group(L["Bags"])
+            form:Toggle({ label = L["Mark speculative items in bags and bank"] .. " " .. ns.ItemMarks.INLINE,
+                description = L["Speculative items (sale rate below the threshold) get a small logo in the top-right corner."],
+                get = function() return settings.ui.markSpeculative ~= false end,
+                set = function(on) settings.ui.markSpeculative = on end })
+        end
 
         form:Group(L["Modules"], L["Switched off modules stop tracking; their data stays."])
         local any = false

@@ -195,9 +195,11 @@ function Summary.Show(summary)
         { L["Vendor"], Money(v.vendor) },
         { L["Realized"], API.Money.Format(v.realized, { color = true, sign = true }) },
     }
-    for i, p in ipairs(pairs_) do
-        window.pairs[i].label:SetText(p[1])
-        window.pairs[i].value:SetText(p[2])
+    if not API.Price:HasRole("saleRate") then table.remove(pairs_, 4) end   -- speculative needs TSM
+    for i = 1, #window.pairs do
+        local p = pairs_[i]
+        window.pairs[i].label:SetText(p and p[1] or "")
+        window.pairs[i].value:SetText(p and p[2] or "")
     end
     window.itemsTitle:SetText(API.Lf("Items (%d)", #rows):upper())
     window.items:SetData(rows)
