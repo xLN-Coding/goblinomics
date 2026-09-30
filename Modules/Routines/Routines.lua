@@ -50,7 +50,7 @@ end
 --- Character key "Name-Realm" of the logged-in character.
 function Routines.CharKey() return Routines.db and Routines.db.charKey end
 
-local PARTS = { "Instances" }
+local PARTS = { "Instances", "Learn" }
 Routines.PARTS = PARTS
 
 function Routines:OnInit()

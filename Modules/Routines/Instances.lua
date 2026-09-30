@@ -54,10 +54,29 @@ function Instances.Read()
     local c = module.db.char
     c.lockouts = list
     c.worldBosses = bosses
+    Instances.LearnTasks(list, bosses)
     c.lockoutsScanned = now
     StoreCharacter()
     ns.API.Emit("ROUTINES_UPDATED", { part = "instances" })
     return list, bosses
+end
+
+--- Suggestions from what the character is saved to: an instance per difficulty
+-- ("i:<mapID>:<difficultyID>") and each world boss ("wb:<id or name>").
+function Instances.LearnTasks(list, bosses)
+    local Tasks = ns.Tasks
+    if not Tasks then return end
+    for _, lock in ipairs(list or {}) do
+        if lock.mapID and lock.difficultyID then
+            Tasks.Learn({ id = ("i:%d:%d"):format(lock.mapID, lock.difficultyID), kind = "instance",
+                name = ("%s (%s)"):format(lock.name, lock.difficulty or lock.difficultyID), frequency = "weekly",
+                ref = { mapID = lock.mapID, name = lock.name, difficultyID = lock.difficultyID, isRaid = lock.isRaid } })
+        end
+    end
+    for _, boss in ipairs(bosses or {}) do
+        Tasks.Learn({ id = "wb:" .. tostring(boss.id or boss.name), kind = "worldboss", name = boss.name,
+            frequency = "weekly", ref = { id = boss.id, name = boss.name } })
+    end
 end
 
 --- charKey -> { lockouts, lockoutsScanned, worldBosses, level, class } (the stored tables).

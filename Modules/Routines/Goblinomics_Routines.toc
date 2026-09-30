@@ -11,4 +11,6 @@
 ## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
 
 Routines.lua
+Tasks.lua
 Instances.lua
+Learn.lua
