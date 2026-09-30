@@ -40,6 +40,58 @@ function View.ExpansionTag(expansion, profession)
     return "  " .. Theme.Colorize("\194\183 " .. table.concat(parts, ", "), Theme.colors.textDim)
 end
 
+--- Tooltip lines of a profession or cooldown row (title, lines).
+function View.TooltipLines(data, now, valuePerPoint)
+    local API, L = ns.API, ns.L
+    local Date = function(t) return API.Format:Date(t, "stamp") end
+    local lines = {}
+    if data.kind == "profession" then
+        local p = data.profession
+        lines[#lines + 1] = L["Concentration"] .. ": " .. (p.current or 0) .. " / " .. (p.max or 1000)
+        if p.fullAt then
+            lines[#lines + 1] = p.fullAt <= now and L["Full"] or API.Lf("Full at %s", Date(p.fullAt))
+        end
+        if p.cycleSec and p.cycleSec > 0 then
+            lines[#lines + 1] = API.Lf("%s points per hour", API.Format:Number(3600 / p.cycleSec * (p.perCycle or 1), 1))
+        end
+        if valuePerPoint and valuePerPoint > 0 then
+            lines[#lines + 1] = API.Lf("Worth now: %s (%s per point)",
+                API.Money.Format(math.floor((p.current or 0) * valuePerPoint), { abbreviate = true }),
+                API.Money.Format(math.floor(valuePerPoint), { abbreviate = true }))
+        end
+        if p.readAt then lines[#lines + 1] = API.Lf("Read %s ago", API.Format:Remaining(now - p.readAt)) end
+        lines[#lines + 1] = L["Log in with the character to read it again."]
+        return (p.name or "?") .. (p.expansion and (" - " .. p.expansion) or ""), lines
+    end
+    local cd = data.cooldown
+    if cd.readyAt then
+        lines[#lines + 1] = cd.readyAt <= now and L["ready"] or API.Lf("Ready at %s", Date(cd.readyAt))
+    end
+    if cd.maxCharges then
+        lines[#lines + 1] = API.Lf("%d/%d charges", cd.charges or 0, cd.maxCharges)
+        if cd.fullAt and cd.fullAt > now then lines[#lines + 1] = API.Lf("All charges at %s", Date(cd.fullAt)) end
+    end
+    if cd.count and cd.count > 1 then
+        lines[#lines + 1] = API.Lf("Shares its cooldown with %d other recipes", cd.count - 1)
+    end
+    if cd.profession or cd.expansion then
+        lines[#lines + 1] = table.concat({ cd.profession, cd.expansion }, ", ")
+    end
+    return cd.name or "?", lines
+end
+
+function View.Tooltip(owner, data)
+    if data.kind ~= "profession" and data.kind ~= "cooldown" then return end
+    local value
+    if data.kind == "profession" then
+        local byProfession = ns.Concentration.ByProfession()
+        local entry = byProfession[data.profession.name]
+        value = entry and entry.value
+    end
+    local title, lines = View.TooltipLines(data, time(), value)
+    ns.API.Widgets.ShowTooltip(owner, title, lines)
+end
+
 --- Flat rows for the list from Professions.Overview: mode "concentration" or
 -- "cooldowns", with the Workshop's profession and character filters.
 function View.Rows(overview, filter, mode)
@@ -149,14 +201,7 @@ function View.Build(parent)
                 collapsed[d.entry.key] = not collapsed[d.entry.key] or nil
                 ns.WorkshopUI.Refresh()
             end)
-            row:SetScript("OnEnter", function(self)
-                local d = self.data
-                if d.kind ~= "profession" or not d.profession.readAt then return end
-                W.ShowTooltip(self, d.profession.name, {
-                    API.Lf("Read %s ago", API.Format:Remaining(time() - d.profession.readAt)),
-                    L["Log in with the character to read it again."],
-                })
-            end)
+            row:SetScript("OnEnter", function(self) View.Tooltip(self, self.data) end)
             row:SetScript("OnLeave", W.HideTooltip)
         end
         row.data = data

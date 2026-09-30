@@ -20,7 +20,11 @@
 - The Workshop is easier to read. Sub-tabs at the top (Overview, Recipes,
   Crafting orders, Salvage, Concentration & cooldowns) replace the long list on
   the left. Recipes are a table you can sort and search, and a click opens the
-  details. The overview shows the important numbers in a few cards.
+  details. Crafting orders and salvaged items open their details the same way;
+  "count an order without own cost" is a button there now instead of a hidden
+  right-click. The overview shows the important numbers in a few cards.
+- Hovering a profession or cooldown shows the exact time it's full or ready,
+  how fast it recharges and what the current concentration is worth in gold.
 
 ## [0.9.1-beta] - 2026-09-28
 

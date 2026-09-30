@@ -87,4 +87,28 @@ describe("Workshop UI", function()
         UI.Refresh()
         assert.equals(0, #UI.CurrentPage().rows)
     end)
+
+    it("opens crafting orders and salvaged items in a details dialog", function()
+        S.craft(300, {}, { { S.result({ id = 950 }) } }, { call = function()
+            C_TradeSkillUI.CraftSalvage(300, 1, { itemID = 900 }, {})
+        end })
+        build()
+        local UI = wns.WorkshopUI
+        local order = { id = 1, output = "i:502", name = "Potion", commission = 1000, rewards = 200, cost = 300,
+            profit = 900, customer = "Bob", time = WoWMock.now, fulfilledAt = WoWMock.now, char = "xLN-Blackrock",
+            profession = "Alchemy", status = "fulfilled" }
+        UI.OpenOrder(order)
+        local page = UI.OrderPage()
+        assert.equals(order, page.order)
+        assert.is_true(page.empty:IsShown())                        -- no craft record, no own reagents
+        wns.Orders.ClearCost = function(o) o.cost, o.manual, o.profit = 0, true, 1200 end
+        UI.OpenOrder(order)
+        local salvage = wns.Salvage.Rows({})
+        assert.equals(1, #salvage)
+        UI.OpenSalvage(salvage[1])
+        local sp = UI.SalvagePage()
+        assert.equals(salvage[1], sp.data)
+        assert.equals(1, #sp.yields)
+        assert.equals("i:950", sp.yields[1].key)
+    end)
 end)

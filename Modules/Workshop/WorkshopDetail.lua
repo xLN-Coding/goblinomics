@@ -212,33 +212,14 @@ function Detail.BuildOrders(parent)
             row.sub:SetPoint("RIGHT", row.cells[1], "LEFT", -6, 0)
             row.sub:SetWordWrap(false)
             Highlight(row)
-            row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-            row:SetScript("OnClick", function(self, button)
-                local order = self.data
-                if button ~= "RightButton" or order.manual then return end
-                W.Confirm({
-                    title = L["Own cost"], text = L["Count this order without own reagent cost?"],
-                    confirmText = L["OK"], onConfirm = function() ns.Orders.ClearCost(order) end,
-                })
-            end)
+            row:SetScript("OnClick", function(self) UI.OpenOrder(self.data) end)
             row:SetScript("OnEnter", function(self)
                 local order = self.data
-                local lines = {
+                W.ShowTooltip(self, order.customer or L["Crafting orders"], {
                     L["Commission"] .. ": " .. UI.Money(order.commission),
                     L["Rewards"] .. ": " .. UI.Money(order.rewards or 0),
-                }
-                local record = ns.Orders.CraftOf(order)
-                if record and (record.saved or 0) > 0 then
-                    lines[#lines + 1] = CODE.good .. API.Lf("Resourcefulness: %s returned for free",
-                        UI.Money(record.saved)) .. "|r"
-                end
-                for _, g in ipairs(record and record.reagents or {}) do
-                    lines[#lines + 1] = ("%s x%d  %s"):format((UI.ItemLabel(g[1])), g[2], UI.Money(g[8] or g[3] * g[2]))
-                end
-                if not record or #record.reagents == 0 then lines[#lines + 1] = L["No own reagents counted."] end
-                if order.manual then lines[#lines + 1] = CODE.dim .. L["Own cost set to 0 by hand."] .. "|r" end
-                lines[#lines + 1] = CODE.dim .. L["Right-click: count without own cost."] .. "|r"
-                W.ShowTooltip(self, order.customer or L["Crafting orders"], lines)
+                    CODE.dim .. L["Click for details."] .. "|r",
+                })
             end)
             row:SetScript("OnLeave", W.HideTooltip)
         end
@@ -273,6 +254,78 @@ function Detail.BuildOrders(parent)
     return page
 end
 
+-- Order details (dialog) ------------------------------------------------------------------
+--- Page for one fulfilled order: head, key figures, the own reagents it counted.
+function Detail.BuildOrder(parent)
+    local API, L, UI = ns.API, ns.L, ns.WorkshopUI
+    local Theme, W = API.Theme, API.Widgets
+    local C, S = Theme.colors, Theme.space
+    local page = Page(parent)
+    local f = page.frame
+    page.icon = f:CreateTexture(nil, "ARTWORK")
+    page.icon:SetSize(32, 32)
+    page.icon:SetPoint("TOPLEFT", 0, 0)
+    page.title = Theme.Text(f, "page", C.text)
+    page.title:SetPoint("TOPLEFT", 40, -1)
+    page.title:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.title:SetWordWrap(false)
+    page.sub = Theme.Text(f, "small", C.textDim)
+    page.sub:SetPoint("TOPLEFT", 40, -19)
+    page.sub:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.sub:SetWordWrap(false)
+    local card, height
+    card, page.stats, height = UI.KeyFigures(f, { { "commission", L["Commission"] }, { "rewards", L["Rewards"] },
+        { "cost", L["Own cost"] }, { "profit", L["Profit"] } }, 110)
+    card:SetPoint("TOPLEFT", 0, -(32 + S.GAP))
+    card:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    local top = -(32 + S.GAP + height + S.GAP)
+    UI.Section(f, L["Own reagents"], 0, top)
+    page.list = W.ScrollList(f, { rowHeight = S.ROW_S + 2, init = function(row, g)
+        if not row.name then
+            row.name = Theme.Text(row, "small", C.text)
+            row.name:SetPoint("LEFT", 4, 0)
+            row.name:SetPoint("RIGHT", row, "RIGHT", -90, 0)
+            row.name:SetWordWrap(false)
+            row.cost = Theme.Text(row, "small", C.text)
+            row.cost:SetPoint("RIGHT", -4, 0)
+            row.cost:SetJustifyH("RIGHT")
+        end
+        row.name:SetText((UI.ItemLabel(g[1])) .. "  " .. CODE.dim .. "x" .. g[2] .. "|r")
+        row.cost:SetText(UI.Money(g[8] or g[3] * g[2]))
+    end })
+    page.list.box:SetPoint("TOPLEFT", 0, top - 16)
+    page.list.box:SetPoint("BOTTOMRIGHT", 0, 20)
+    page.empty = W.EmptyState(page.list.box, L["No own reagents counted."])
+    page.note = Theme.Text(f, "small", C.textDim)
+    page.note:SetPoint("BOTTOMLEFT", 0, 2)
+    page.note:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.note:SetJustifyH("LEFT")
+
+    function page.Refresh(order)
+        page.order = order
+        page.icon:SetTexture(UI.ItemIcon(order.output))
+        page.title:SetText(order.output and (UI.ItemLabel(order.output)) or (order.name or "?"))
+        page.sub:SetText(table.concat({ order.customer or "-", API.Format:Date(order.fulfilledAt or order.time, "stamp"),
+            UI.ShortName(order.char), order.profession or "" }, "  \194\183  "))
+        page.stats.commission:SetText(UI.Money(order.commission))
+        page.stats.rewards:SetText(UI.Money(order.rewards or 0))
+        page.stats.cost:SetText(UI.Money(order.cost))
+        page.stats.profit:SetText(UI.Money(order.profit, { color = true, sign = true }))
+        local record = ns.Orders.CraftOf(order)
+        local reagents = record and record.reagents or {}
+        page.list:SetData(reagents)
+        page.empty:SetShown(#reagents == 0)
+        local notes = {}
+        if record and (record.saved or 0) > 0 then
+            notes[#notes + 1] = API.Lf("Resourcefulness: %s returned for free", UI.Money(record.saved))
+        end
+        if order.manual then notes[#notes + 1] = L["Own cost set to 0 by hand."] end
+        if order.incomplete then notes[#notes + 1] = L["Some reagent costs are unknown."] end
+        page.note:SetText(table.concat(notes, "   "))
+    end
+    return page
+end
+
 -- Salvage -------------------------------------------------------------------------------
 local SALVAGE_COLS = { 50, 70, 70, 76 }
 
@@ -293,17 +346,14 @@ function Detail.BuildSalvage(parent)
         if not row.first then
             row.first, row.cells = Columns(row, SALVAGE_COLS)
             Highlight(row)
+            row:SetScript("OnClick", function(self) UI.OpenSalvage(self.data) end)
             row:SetScript("OnEnter", function(self)
-                local lines = {}
-                for key, qty in pairs(self.data.outputs) do lines[#lines + 1] = (UI.ItemLabel(key)) .. " x" .. qty end
-                table.sort(lines)
                 local d = self.data
-                lines[#lines + 1] = " "
-                lines[#lines + 1] = L["Sold"] .. ": " .. UI.Money(d.revenue)
-                lines[#lines + 1] = L["Processed further"] .. ": " .. UI.Money(d.transferred)
-                lines[#lines + 1] = L["Cost"] .. ": " .. UI.Money(-d.cost, { color = true })
-                lines[#lines + 1] = CODE.dim .. L["Unsold yield at market price"] .. ": " .. UI.Money(d.openValue) .. "|r"
-                W.ShowTooltip(self, L["Yield"], lines)
+                W.ShowTooltip(self, L["Yield"], {
+                    L["Sold"] .. ": " .. UI.Money(d.revenue),
+                    L["Processed further"] .. ": " .. UI.Money(d.transferred),
+                    CODE.dim .. L["Click for details."] .. "|r",
+                })
             end)
             row:SetScript("OnLeave", W.HideTooltip)
         end
@@ -335,3 +385,92 @@ function Detail.BuildSalvage(parent)
     end
     return page
 end
+
+-- Salvage details (dialog) ------------------------------------------------------------------
+--- Page for one salvaged item: head, key figures, the yields with quantity and value,
+-- and how the yield was used (sold, processed further, still in stock).
+function Detail.BuildSalvageItem(parent)
+    local API, L, UI = ns.API, ns.L, ns.WorkshopUI
+    local Theme, W = API.Theme, API.Widgets
+    local C, S = Theme.colors, Theme.space
+    local page = Page(parent)
+    local f = page.frame
+    page.icon = f:CreateTexture(nil, "ARTWORK")
+    page.icon:SetSize(32, 32)
+    page.icon:SetPoint("TOPLEFT", 0, 0)
+    page.title = Theme.Text(f, "page", C.text)
+    page.title:SetPoint("TOPLEFT", 40, -1)
+    page.title:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.title:SetWordWrap(false)
+    page.sub = Theme.Text(f, "small", C.textDim)
+    page.sub:SetPoint("TOPLEFT", 40, -19)
+    local card, height
+    card, page.stats, height = UI.KeyFigures(f, { { "ops", L["Operations"] }, { "cost", L["Cost"] },
+        { "income", L["Income"] }, { "profit", L["Profit"] } }, 110)
+    card:SetPoint("TOPLEFT", 0, -(32 + S.GAP))
+    card:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    local top = -(32 + S.GAP + height + S.GAP)
+    UI.Section(f, L["Yield"], 0, top)
+    page.list = W.ScrollList(f, { rowHeight = S.ROW_S + 2, init = function(row, y)
+        if not row.name then
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(14, 14)
+            row.icon:SetPoint("LEFT", 4, 0)
+            row.name = Theme.Text(row, "small", C.text)
+            row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+            row.name:SetPoint("RIGHT", row, "RIGHT", -90, 0)
+            row.name:SetWordWrap(false)
+            row.value = Theme.Text(row, "small", C.text)
+            row.value:SetPoint("RIGHT", -4, 0)
+            row.value:SetJustifyH("RIGHT")
+        end
+        row.icon:SetTexture(UI.ItemIcon(y.key))
+        row.name:SetText((UI.ItemLabel(y.key)) .. "  " .. CODE.dim .. "x" .. y.qty .. "|r")
+        row.value:SetText(y.value and UI.Money(y.value) or CODE.dim .. "-|r")
+    end })
+    page.list.box:SetPoint("TOPLEFT", 0, top - 16)
+    page.list.box:SetPoint("BOTTOMRIGHT", 0, 48)
+    page.usage = Theme.Text(f, "small", C.text)
+    page.usage:SetPoint("BOTTOMLEFT", 0, 20)
+    page.usage:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.usage:SetJustifyH("LEFT")
+    page.note = Theme.Text(f, "small", C.textDim)
+    page.note:SetPoint("BOTTOMLEFT", 0, 2)
+    page.note:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    page.note:SetJustifyH("LEFT")
+
+    --- Yields sorted by value: { { key, qty, value } } (value at the current market price).
+    function page.Yields(s)
+        local list = {}
+        for key, qty in pairs(s.outputs or {}) do
+            local unit = ns.Reagents.UnitPrice(key)
+            list[#list + 1] = { key = key, qty = qty, value = unit and unit * qty or nil }
+        end
+        table.sort(list, function(a, b)
+            if (a.value or 0) ~= (b.value or 0) then return (a.value or 0) > (b.value or 0) end
+            return a.key < b.key
+        end)
+        return list
+    end
+
+    function page.Refresh(s)
+        page.data = s
+        page.icon:SetTexture(UI.ItemIcon(s.input))
+        page.title:SetText(s.input and (UI.ItemLabel(s.input)) or (s.name or "?"))
+        page.sub:SetText(s.name or "")
+        page.stats.ops:SetText(tostring(s.operations))
+        page.stats.cost:SetText(UI.Money(s.cost))
+        page.stats.income:SetText(UI.Money(s.revenue + s.transferred))
+        page.stats.profit:SetText(UI.Money(s.profit, { color = true, sign = true }))
+        page.yields = page.Yields(s)
+        page.list:SetData(page.yields)
+        page.usage:SetText(table.concat({
+            L["Sold"] .. " " .. UI.Money(s.revenue),
+            L["Processed further"] .. " " .. UI.Money(s.transferred),
+            L["Cost"] .. " " .. UI.Money(-s.cost, { color = true }),
+        }, "   "))
+        page.note:SetText(L["Unsold yield at market price"] .. ": " .. UI.Money(s.openValue))
+    end
+    return page
+end
+

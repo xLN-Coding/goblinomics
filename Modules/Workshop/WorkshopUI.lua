@@ -194,6 +194,43 @@ end
 
 function UI.DetailPage() return tab.detailPage end
 
+-- Order details: a dialog with the order page; the button counts it without own cost.
+function UI.OpenOrder(order)
+    if not tab.order then
+        tab.order = API.Widgets.Dialog({ title = L["Crafting orders"], width = 520, height = 420,
+            name = "GoblinomicsWorkshopOrder", buttons = {
+                { text = L["Count without own cost"], width = 180, onClick = function()
+                    local o = tab.orderPage.order
+                    if o and not o.manual then
+                        ns.Orders.ClearCost(o)
+                        tab.orderPage.Refresh(o)
+                        tab.order.buttons[1]:Hide()
+                    end
+                end },
+                { text = L["Close"], primary = true, onClick = function() tab.order:Hide() end },
+            } })
+        tab.orderPage = ns.WorkshopDetail.BuildOrder(tab.order.body)
+    end
+    tab.order.buttons[1]:SetShown(not order.manual)
+    tab.order:Show()
+    tab.orderPage.Refresh(order)
+end
+
+function UI.OrderPage() return tab.orderPage end
+
+-- Salvage details: a dialog with the salvaged item's yields and their use.
+function UI.OpenSalvage(row)
+    if not tab.salvage then
+        tab.salvage = API.Widgets.Dialog({ title = L["Salvage"], width = 520, height = 420,
+            name = "GoblinomicsWorkshopSalvage" })
+        tab.salvagePage = ns.WorkshopDetail.BuildSalvageItem(tab.salvage.body)
+    end
+    tab.salvage:Show()
+    tab.salvagePage.Refresh(row)
+end
+
+function UI.SalvagePage() return tab.salvagePage end
+
 local function Choices(field)
     local seen = {}
     local list = { { value = ALL, label = field == "profession" and L["All professions"] or L["All characters"] } }

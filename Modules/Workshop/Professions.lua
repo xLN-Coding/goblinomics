@@ -276,7 +276,7 @@ function Professions.Overview(root, settings, now)
               -- lines stored before the expansion was kept belong to the current expansion
               if expansion == "all" or Professions.LineExpansion(p) == expansion then
                 e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon,
-                    expansion = Professions.LineExpansion(p),
+                    expansion = Professions.LineExpansion(p), cycleSec = p.cycleSec, perCycle = p.perCycle or 1,
                     current = Professions.Current(p, now), max = p.max or 1000, readAt = p.readAt,
                     fullAt = Professions.FullAt(p, threshold) }
               end

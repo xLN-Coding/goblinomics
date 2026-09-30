@@ -215,4 +215,24 @@ describe("Workshop: concentration and cooldowns", function()
         for _, s in ipairs(ns.UI.SortedSettings()) do if s.id == "workshop" then section = s end end
         assert.is_true(section.build(CreateFrame("Frame"), 0) > 200)
     end)
+
+    it("explains a profession and a cooldown row in its tooltip", function()
+        local V = wns.WorkshopProfessions
+        local now = 100000
+        local title, lines = V.TooltipLines({ kind = "profession", profession = { name = "Alchemy", expansion = "Midnight",
+            current = 500, max = 1000, fullAt = now + 3600, readAt = now - 600, cycleSec = 360, perCycle = 1 } }, now, 250)
+        assert.equals("Alchemy - Midnight", title)
+        local text = table.concat(lines, "|")
+        assert.is_truthy(text:find("500 / 1000", 1, true))
+        assert.is_truthy(text:find("Full at", 1, true))
+        assert.is_truthy(text:find("points per hour", 1, true))
+        assert.is_truthy(text:find("Worth now", 1, true))
+        title, lines = V.TooltipLines({ kind = "cooldown", cooldown = { name = "Transmute: Ore", readyAt = now + 60,
+            count = 2, profession = "Alchemy", expansion = "Midnight", maxCharges = 3, charges = 1, fullAt = now + 900 } }, now)
+        assert.equals("Transmute: Ore", title)
+        text = table.concat(lines, "|")
+        assert.is_truthy(text:find("Ready at", 1, true))
+        assert.is_truthy(text:find("1/3 charges", 1, true))
+        assert.is_truthy(text:find("1 other recipes", 1, true))
+    end)
 end)
