@@ -49,6 +49,13 @@ end
 API.Workshop = {
     Breakdown = function(_, filter) return ns.Stats and ns.Stats.Breakdown(filter or {}) end,
     Daily = function(_, days, filter) return ns.Stats and ns.Stats.Daily(days, filter or {}) end,
+    --- Concentration full and cooldowns ready over all characters (the Workshop's expansion
+    -- filter and threshold): { { char, name, class, kind, label, icon, at, id, lineID, recipeID } }.
+    Due = function(_, now)
+        return ns.Professions and ns.Professions.Due(Workshop.db.root, Workshop.db.settings, now) or {}
+    end,
+    --- Gold value of one concentration point per profession: { [profession] = { value, crafts, points } }.
+    ConcentrationValue = function(_, days) return ns.Concentration and ns.Concentration.ByProfession(days) or {} end,
 }
 
 --- New record id (unique per account).

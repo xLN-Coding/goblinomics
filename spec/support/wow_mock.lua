@@ -111,6 +111,9 @@ function mock.reset()
     mock.durability = {}    -- durability[slot] = { current, max }
     mock.savedInstances = {} -- { name, id, reset, difficulty, locked, isRaid, difficultyName, ... }
     mock.worldBosses = {}    -- { name, id, reset }
+    mock.vaultWorld = {}     -- Great Vault world row: { { progress, threshold } }
+    mock.crafterOrders = {}  -- C_CraftingOrders.GetCrafterOrders()
+    mock.baseProfession = nil
     mock.quests = {}         -- quests[questID] = { title, frequency (1 daily, 2 weekly), inLog, completed }
     mock.currentQuest = 0    -- the quest of the reward panel
     mock.questReward = { money = 0, items = {} }   -- items = { { link, count } }
@@ -351,6 +354,7 @@ _G.GetSavedWorldBossInfo = function(i)
     return b.name, b.id or i, b.reset or 3600
 end
 _G.C_DateAndTime = { GetSecondsUntilWeeklyReset = function() return mock.weeklyReset end }
+_G.C_WeeklyRewards = { GetActivities = function() return mock.vaultWorld end }
 _G.GetQuestResetTime = function() return mock.dailyReset end
 _G.C_QuestLog = {
     GetLogIndexForQuestID = function(id) local q = mock.quests[id]; return q and q.inLog ~= false and id or nil end,
@@ -410,6 +414,7 @@ InstallHookables = function()
     _G.C_CraftingOrders = {
         FulfillOrder = function() end,
         GetClaimedOrder = function() return mock.claimedOrder end,
+        GetCrafterOrders = function() return mock.crafterOrders end,
     }
     _G.C_TradeSkillUI = {
         CraftRecipe = function() end,
@@ -438,6 +443,7 @@ InstallHookables = function()
         end,
         GetOriginalCraftRecipeID = function(guid) return mock.recraftRecipes[guid] end,
         GetChildProfessionInfos = function() return mock.childProfessions end,
+        GetBaseProfessionInfo = function() return mock.baseProfession end,
         GetConcentrationCurrencyID = function(id) return mock.concentrationIDs[id] or 0 end,
         GetProfessionChildSkillLineID = function() return mock.childSkillLine end,
         GetAllRecipeIDs = function() return mock.recipeIDs end,
@@ -577,6 +583,8 @@ _G.EXPANSION_NAME12 = "Expansion 12"
 _G.Enum = {
     ExpansionLevel = { WarWithin = 10, Midnight = 11 },
     QuestFrequency = { Default = 0, Daily = 1, Weekly = 2 },
+    WeeklyRewardChestThresholdType = { Raid = 3, Activities = 1, World = 6 },
+    CraftingOrderType = { Public = 0, Guild = 1, Personal = 2, Npc = 3 },
     BagIndex = { Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
         CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, CharacterBankTab_4 = 9,
         CharacterBankTab_5 = 10, CharacterBankTab_6 = 11,

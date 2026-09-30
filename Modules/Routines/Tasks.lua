@@ -82,14 +82,18 @@ end
 function Tasks.Estimate(t, settings)
     settings = settings or Settings()
     local m = t.measured or {}
+    local otherValue, otherMinutes
+    if ns.Activities and ns.Activities.Estimate then otherValue, otherMinutes = ns.Activities.Estimate(t) end
     local value, valueSource
     if t.value then value, valueSource = t.value, "manual"
     elseif m.value then value, valueSource = m.value, "measured"
+    elseif otherValue then value, valueSource = otherValue, "measured"
     elseif t.preset and t.preset.value then value, valueSource = t.preset.value, "preset"
     else value, valueSource = 0, "none" end
     local minutes, minutesSource
     if t.duration then minutes, minutesSource = t.duration, "manual"
     elseif m.minutes then minutes, minutesSource = m.minutes, "measured"
+    elseif otherMinutes then minutes, minutesSource = otherMinutes, "measured"
     elseif t.preset and t.preset.duration then minutes, minutesSource = t.preset.duration, "preset"
     else minutes, minutesSource = (settings.durations or {})[t.kind] or 10, "default" end
     minutes = math.max(1, minutes)
@@ -146,7 +150,7 @@ function Tasks.State(t, charKey, now)
             end
         end
     elseif ns.Activities and ns.Activities.State then
-        local activityDone, detail, resetAt = ns.Activities.State(t, c, now)
+        local activityDone, detail, resetAt = ns.Activities.State(t, c, now, charKey)
         if activityDone ~= nil then return activityDone, detail, resetAt end
     end
     return false

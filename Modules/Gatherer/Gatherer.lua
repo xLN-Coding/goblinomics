@@ -86,6 +86,21 @@ API.Gatherer = {
         table.sort(list, function(a, b) return (a.started or 0) > (b.started or 0) end)
         return list
     end,
+    --- Runs of the farms for an instance map (raids, dungeons, delves): { runs, value,
+    -- minutes } with the average value (copper) and duration of a run, or nil.
+    InstanceStats = function(_, mapID)
+        local root = Gatherer.db and Gatherer.db.root
+        if not (root and mapID and ns.Farms) then return nil end
+        local runs, total, duration = 0, 0, 0
+        for id, farm in pairs(root.farms or {}) do
+            if type(farm) == "table" and type(farm.instance) == "table" and farm.instance.mapID == mapID then
+                local s = ns.Farms.Stats(id)
+                runs, total, duration = runs + s.runs, total + s.total, duration + s.totalDuration
+            end
+        end
+        if runs == 0 then return nil end
+        return { runs = runs, value = total / runs, minutes = duration / runs / 60 }
+    end,
 }
 
 ns.CATEGORIES = { "gathering", "fishing", "openworld", "dungeon", "raid", "other" }
