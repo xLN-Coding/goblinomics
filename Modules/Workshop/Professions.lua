@@ -42,24 +42,61 @@ local function CooldownExpansion(recipeID, cd)
     return cd.expansion
 end
 
+-- Professions name their expansion lines after the region ("Khaz Algar", "Dragon
+-- Isles", "Pandaria"), not after the expansion. Their order comes from the game: the
+-- child lines of a profession window, stored oldest first in root.expansionOrder.
+
+--- Store the expansion order of a profession window's child lines (oldest first).
+-- The window opens on the newest line; that tells the direction of the list.
+function Professions.LearnOrder(root, children, openLine)
+    local names = {}
+    local openIndex
+    for _, info in ipairs(children or {}) do
+        if info.expansionName then names[#names + 1] = info.expansionName end
+        if openLine and info.professionID == openLine then openIndex = #names end
+    end
+    if #names < 2 then return end
+    local current = CurrentExpansionName()
+    local newestFirst = openIndex == 1
+    for i, name in ipairs(names) do
+        if current and name == current then newestFirst = i == 1 end
+    end
+    if newestFirst then
+        local reversed = {}
+        for i = #names, 1, -1 do reversed[#reversed + 1] = names[i] end
+        names = reversed
+    end
+    if #names >= #(root.expansionOrder or {}) then root.expansionOrder = names end
+end
+
 --- Order of an expansion name (newest highest); unknown names last.
-local function ExpansionLevel(name)
+local function ExpansionLevel(root, name)
+    for i, n in ipairs(root and root.expansionOrder or {}) do
+        if n == name then return 100 + i end
+    end
     for level = 30, 0, -1 do
         if _G["EXPANSION_NAME" .. level] == name then return level end
     end
     return -1
 end
 
+--- The current expansion as professions name it: the newest learned line, else the client's name.
+function Professions.CurrentExpansion(root)
+    local order = root and root.expansionOrder
+    if order and #order > 0 then return order[#order] end
+    return CurrentExpansionName()
+end
+
 --- The expansion filter for concentration and cooldowns: nil / "current" means the
 -- current expansion, "all" everything, otherwise an expansion name.
-function Professions.ExpansionFilter(settings)
+function Professions.ExpansionFilter(settings, root)
     local value = settings and settings.professionsExpansion
-    if value == nil or value == "current" then return CurrentExpansionName() or "all" end
+    if value == nil or value == "current" then return Professions.CurrentExpansion(root) or "all" end
     return value
 end
 
---- Every expansion the client knows (Classic up to the current one), newest first,
--- plus names from stored entries the client does not list.
+--- Expansions to choose from, newest first: the order the profession windows showed,
+-- plus names of stored entries; before any window was open the client's names.
 function Professions.Expansions(root)
     local seen, list = {}, {}
     local function Add(name)
@@ -68,20 +105,30 @@ function Professions.Expansions(root)
             list[#list + 1] = name
         end
     end
-    for level = 0, 30 do Add(_G["EXPANSION_NAME" .. level]) end
+    for _, name in ipairs(root and root.expansionOrder or {}) do Add(name) end
     for _, c in pairs(root and root.chars or {}) do
         if type(c) == "table" then
             for recipeID, cd in pairs(c.cooldowns or {}) do Add(CooldownExpansion(recipeID, cd)) end
             for _, p in pairs(c.professions or {}) do Add(p.expansion) end
         end
     end
-    table.sort(list, function(a, b) return ExpansionLevel(a) > ExpansionLevel(b) end)
+    if #list == 0 then
+        -- the client also names coming expansions ("Expansion 12"): only up to the current one
+        local current = GetServerExpansionLevel and GetServerExpansionLevel()
+            or (Enum and Enum.ExpansionLevel and Enum.ExpansionLevel.Midnight) or 30
+        for level = 0, current do Add(_G["EXPANSION_NAME" .. level]) end
+    end
+    table.sort(list, function(a, b)
+        local x, y = ExpansionLevel(root, a), ExpansionLevel(root, b)
+        if x ~= y then return x > y end
+        return a < b
+    end)
     return list
 end
 
 --- Expansion of a profession line; lines stored before it was kept belong to the current one.
-function Professions.LineExpansion(p)
-    return p.expansion or CurrentExpansionName()
+function Professions.LineExpansion(p, root)
+    return p.expansion or Professions.CurrentExpansion(root)
 end
 
 -- Pure computation --------------------------------------------------------------------
@@ -150,9 +197,12 @@ function Professions.ReadWindow()
     if not c or not ts or not ts.GetChildProfessionInfos or not ts.GetConcentrationCurrencyID then return end
     c.professions = c.professions or {}
     local changed = false
-    for _, info in ipairs(ts.GetChildProfessionInfos() or {}) do
+    local children = ts.GetChildProfessionInfos() or {}
+    Professions.LearnOrder(module.db.root, children, ts.GetProfessionChildSkillLineID and ts.GetProfessionChildSkillLineID())
+    for _, info in ipairs(children) do
         local id = info.professionID
-        if id then
+        local runeforging = id == ns.Recipes.RUNEFORGING or info.parentProfessionID == ns.Recipes.RUNEFORGING
+        if id and not runeforging then
             local currencyID = ts.GetConcentrationCurrencyID(id)
             if currencyID and currencyID ~= 0 then
                 local p = c.professions[id] or {}
@@ -196,7 +246,7 @@ end
 function Professions.ReadCooldown(recipeID)
     local c = Char()
     local ts = C_TradeSkillUI
-    if not c or not ts or not ts.GetRecipeCooldown or CooldownsSecret() then return false end
+    if not c or not ts or not ts.GetRecipeCooldown or CooldownsSecret() or ns.Recipes.IsIgnored(recipeID) then return false end
     local cd, isDay, charges, maxCharges = ts.GetRecipeCooldown(recipeID)
     if IsSecret(cd) or IsSecret(charges) then return false end
     cd, charges, maxCharges = cd or 0, charges or 0, maxCharges or 0
@@ -271,12 +321,12 @@ function Professions.Overview(root, settings, now)
         if type(c) == "table" and not hidden[charKey] and (next(c.professions or {}) or next(c.cooldowns or {})) then
             local e = { key = charKey, name = c.name or charKey:match("^([^%-]+)") or charKey, class = c.class,
                 professions = {}, cooldowns = {} }
-            local expansion = Professions.ExpansionFilter(settings)
+            local expansion = Professions.ExpansionFilter(settings, root)
             for id, p in pairs(c.professions or {}) do
               -- lines stored before the expansion was kept belong to the current expansion
-              if expansion == "all" or Professions.LineExpansion(p) == expansion then
+              if expansion == "all" or Professions.LineExpansion(p, root) == expansion then
                 e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon,
-                    expansion = Professions.LineExpansion(p), cycleSec = p.cycleSec, perCycle = p.perCycle or 1,
+                    expansion = Professions.LineExpansion(p, root), cycleSec = p.cycleSec, perCycle = p.perCycle or 1,
                     current = Professions.Current(p, now), max = p.max or 1000, readAt = p.readAt,
                     fullAt = Professions.FullAt(p, threshold) }
               end

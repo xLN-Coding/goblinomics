@@ -146,7 +146,7 @@ function Tracker.Flush()
         -- enchants on gear have no item; enchants on vellum produce a scroll
         if not (r.isEnchant and not r.hyperlink and not r.itemID) then kept[#kept + 1] = r end
     end
-    if #kept == 0 then return end
+    if #kept == 0 or ns.Recipes.IsIgnored(op.recipeID) then return end
     local crafts = op.crafts - op.used
     if crafts <= 0 then crafts = 1 end
     op.used = op.used + crafts

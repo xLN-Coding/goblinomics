@@ -9,7 +9,7 @@ describe("Workshop: concentration and cooldowns", function()
             { professionID = 2900, professionName = "Midnight Alchemy", parentProfessionID = 171,
                 parentProfessionName = "Alchemy", expansionName = "Midnight" },
             { professionID = 2823, professionName = "Khaz Algar Alchemy", parentProfessionID = 171,
-                parentProfessionName = "Alchemy", expansionName = "The War Within" },
+                parentProfessionName = "Alchemy", expansionName = "Khaz Algar" },
         }
         WoWMock.concentrationIDs = { [2900] = 3100, [2823] = 3050 }
         WoWMock.childSkillLine = 2900
@@ -52,14 +52,15 @@ describe("Workshop: concentration and cooldowns", function()
         WoWMock.flush()
         local lines = char().professions
         assert.is_table(lines[2900])
-        assert.equals("The War Within", lines[2823].expansion)
+        assert.equals("Khaz Algar", lines[2823].expansion)
         local root = GoblinomicsWorkshopDB
         assert.equals(1, #P.Overview(root, {}, WoWMock.now)[1].professions)                -- Midnight by default
         assert.equals(2, #P.Overview(root, { professionsExpansion = "all" }, WoWMock.now)[1].professions)
-        local tww = P.Overview(root, { professionsExpansion = "The War Within" }, WoWMock.now)[1].professions
+        local tww = P.Overview(root, { professionsExpansion = "Khaz Algar" }, WoWMock.now)[1].professions
         assert.equals(1000, tww[1].current)
-        assert.same({ "Midnight", "The War Within", "Wrath of the Lich King", "The Burning Crusade", "Classic" },
-            P.Expansions(root))                                     -- every expansion, newest first
+        assert.same({ "Khaz Algar", "Midnight" }, root.expansionOrder)       -- learned from the window, oldest first
+        assert.same({ "Midnight", "Khaz Algar" }, P.Expansions(root))       -- the names professions use, newest first
+        assert.equals("Midnight", P.CurrentExpansion(root))
         assert.is_truthy(wns.WorkshopProfessions.ExpansionTag("Midnight"):find("Midnight"))
         assert.is_truthy(wns.WorkshopProfessions.ExpansionTag("Classic", "Engineering"):find("Engineering, Classic"))
         assert.equals("", wns.WorkshopProfessions.ExpansionTag(nil))
@@ -234,5 +235,38 @@ describe("Workshop: concentration and cooldowns", function()
         assert.is_truthy(text:find("Ready at", 1, true))
         assert.is_truthy(text:find("1/3 charges", 1, true))
         assert.is_truthy(text:find("1 other recipes", 1, true))
+    end)
+
+    it("leaves runeforging out and lists expansions only up to the current one", function()
+        WoWMock.recipes[800] = { name = "Rune of the Fallen Crusader", profession = "Runeforging", professionID = 960 }
+        assert.is_true(wns.Recipes.IsIgnored(800))
+        assert.is_false(wns.Recipes.IsIgnored(700))
+        WoWMock.recipeCooldowns[800] = { 60, true, 0, 0 }
+        assert.is_false(P.ReadCooldown(800))
+        local root = GoblinomicsWorkshopDB
+        root.crafts[#root.crafts + 1] = { id = 9001, recipe = 800, time = WoWMock.now, reagents = {}, outputs = {} }
+        char().cooldowns = { [800] = { name = "Rune", readyAt = WoWMock.now } }
+        assert.equals(1, wns.Recipes.PurgeIgnored(root))
+        assert.is_nil(char().cooldowns[800])
+        for _, name in ipairs(P.Expansions(root)) do assert.are_not.equal("Expansion 12", name) end
+    end)
+
+    it("learns the expansion order from a profession window in either direction", function()
+        local root = { chars = {} }
+        local list = { { professionID = 1, expansionName = "Classic" }, { professionID = 2, expansionName = "Pandaria" },
+            { professionID = 3, expansionName = "Dragon Isles" }, { professionID = 4, expansionName = "Khaz Algar" } }
+        P.LearnOrder(root, list, 4)                                   -- opened on the newest, listed oldest first
+        assert.same({ "Classic", "Pandaria", "Dragon Isles", "Khaz Algar" }, root.expansionOrder)
+        local reversed = {}
+        for i = #list, 1, -1 do reversed[#reversed + 1] = list[i] end
+        local other = { chars = {} }
+        P.LearnOrder(other, reversed, 4)                              -- listed newest first
+        assert.same(root.expansionOrder, other.expansionOrder)
+        other.chars.x = { cooldowns = { [1] = { expansion = "Northrend" } } }
+        assert.same({ "Khaz Algar", "Dragon Isles", "Pandaria", "Classic", "Northrend" }, P.Expansions(other))
+        assert.equals("Khaz Algar", P.CurrentExpansion(root))
+        local fresh = P.Expansions({ chars = {} })                    -- before any window: the client's names
+        assert.equals("Midnight", fresh[1])
+        for _, name in ipairs(fresh) do assert.are_not.equal("Expansion 12", name) end
     end)
 end)

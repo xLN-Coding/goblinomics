@@ -35,6 +35,34 @@ function Recipes.Info(recipeID)
     return info
 end
 
+-- Runeforging (death knights) is a profession line to the game but not a craft:
+-- its recipes are never tracked, and older records of it are removed.
+local RUNEFORGING = 960
+Recipes.RUNEFORGING = RUNEFORGING
+
+--- Is a recipe left out of the Workshop (runeforging)?
+function Recipes.IsIgnored(recipeID)
+    local info = Recipes.Info(recipeID)
+    return info ~= nil and info.professionID == RUNEFORGING
+end
+
+--- Remove records of ignored recipes (crafts, cooldowns of every character).
+function Recipes.PurgeIgnored(root)
+    local removed = 0
+    for i = #(root.crafts or {}), 1, -1 do
+        if Recipes.IsIgnored(root.crafts[i].recipe) then
+            table.remove(root.crafts, i)
+            removed = removed + 1
+        end
+    end
+    for _, c in pairs(root.chars or {}) do
+        for recipeID in pairs(type(c) == "table" and c.cooldowns or {}) do
+            if Recipes.IsIgnored(recipeID) then c.cooldowns[recipeID] = nil end
+        end
+    end
+    return removed
+end
+
 --- Item key of the recipe's output at `quality` (1..n), or nil.
 function Recipes.QualityItemKey(recipeID, quality, reagents)
     if not quality or quality < 1 then return nil end

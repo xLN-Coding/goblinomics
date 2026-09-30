@@ -74,7 +74,7 @@ read_globals = {
     -- Namespaces
     "C_AddOns", "C_Timer", "C_Container", "C_Bank", "C_Item", "C_Mail",
     "C_TradeSkillUI", "C_RestrictedActions", "C_PlayerInfo", "C_AuctionHouse",
-    "C_CurrencyInfo", "C_Secrets", "C_Spell", "C_ChallengeMode", "C_EventUtils", "C_AddOnProfiler", "Enum",
+    "C_CurrencyInfo", "C_Secrets", "C_Spell", "GetServerExpansionLevel", "C_ChallengeMode", "C_EventUtils", "C_AddOnProfiler", "Enum",
     -- Libraries
     "LibStub",
     -- GlobalStrings

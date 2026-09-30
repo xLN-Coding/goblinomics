@@ -162,7 +162,8 @@ function View.Build(parent)
         end, { min = 90 })
     page.mode:SetPoint("TOPLEFT", 0, 0)
     page.expansion = W.Dropdown(f, function()
-        local list = { { value = "current", label = L["Current expansion"] } }
+        local current = ns.Professions.CurrentExpansion(ns.Workshop.db.root)
+        local list = { { value = "current", label = L["Current expansion"] .. (current and (" (" .. current .. ")") or "") } }
         for _, name in ipairs(ns.Professions.Expansions(ns.Workshop.db.root)) do
             list[#list + 1] = { value = name, label = name }
         end

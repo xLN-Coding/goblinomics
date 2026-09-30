@@ -63,6 +63,7 @@ function Workshop:OnEnable()
     for _, part in ipairs(PARTS) do
         if ns[part] and ns[part].Enable then ns[part].Enable(self) end
     end
+    ns.Recipes.PurgeIgnored(self.db.root)   -- runeforging recorded before it was left out
 end
 
 function Workshop:OnDisable()

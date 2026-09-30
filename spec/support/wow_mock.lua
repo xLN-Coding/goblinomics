@@ -546,6 +546,7 @@ _G.EXPANSION_NAME1 = "The Burning Crusade"
 _G.EXPANSION_NAME2 = "Wrath of the Lich King"
 _G.EXPANSION_NAME10 = "The War Within"
 _G.EXPANSION_NAME11 = "Midnight"
+_G.EXPANSION_NAME12 = "Expansion 12"
 _G.Enum = {
     ExpansionLevel = { WarWithin = 10, Midnight = 11 },
     BagIndex = { Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
