@@ -270,7 +270,8 @@ local function BuildSettings(parent, y)
     local function changed()
         API.Emit("WORKSHOP_PROFESSIONS", {})
     end
-    form:Group(L["Concentration & cooldowns"], L["Concentration is read when you log in or open a profession window, and computed from then on."])
+    form:Group(L["Concentration & cooldowns"],
+        L["Concentration is read when you log in or open a profession window, and computed from then on."])
     form:Slider({ label = L["Notify at concentration"],
         description = L["A notice comes when a character's concentration reaches this value."],
         min = 100, max = 1000, step = 50,
