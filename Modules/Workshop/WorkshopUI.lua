@@ -266,6 +266,45 @@ local function BuildSettings(parent, y)
     number(L["Concentration value over (days)"], L["Period for the gold value of one concentration point."],
         "concentrationDays")
     form:Note(L["Realized profit needs the Ledger module: it reports the auction house sales."])
+
+    local function changed()
+        API.Emit("WORKSHOP_PROFESSIONS", {})
+    end
+    form:Group(L["Concentration & cooldowns"], L["Concentration is read when you log in or open a profession window, and computed from then on."])
+    form:Slider({ label = L["Notify at concentration"],
+        description = L["A notice comes when a character's concentration reaches this value."],
+        min = 100, max = 1000, step = 50,
+        get = function() return settings.concentrationThreshold end,
+        set = function(v)
+            settings.concentrationThreshold = v
+            changed()
+        end })
+    form:Toggle({ label = L["Toast while playing"],
+        description = L["When a character's concentration is full or a cooldown is ready."],
+        get = function() return settings.notifyToast end,
+        set = function(on) settings.notifyToast = on end })
+    form:Toggle({ label = L["Chat line at login"], description = L["Everything that is full or ready, once after login."],
+        get = function() return settings.notifyChat end,
+        set = function(on) settings.notifyChat = on end })
+    form:Toggle({ label = L["Line in the minimap tooltip"], description = L["How many are ready and when the next one is."],
+        get = function() return settings.notifyTooltip end,
+        set = function(on) settings.notifyTooltip = on end })
+    local chars = {}
+    for charKey, c in pairs(module.db.root.chars) do
+        if type(c) == "table" and (next(c.professions or {}) or next(c.cooldowns or {})) then chars[#chars + 1] = charKey end
+    end
+    table.sort(chars)
+    if #chars > 0 then
+        form:Group(L["Characters"], L["Switched off characters are left out of concentration and cooldowns."])
+        for _, charKey in ipairs(chars) do
+            form:Toggle({ label = UI.ShortName(charKey), description = charKey,
+                get = function() return not settings.professionsHidden[charKey] end,
+                set = function(on)
+                    settings.professionsHidden[charKey] = (not on) or nil
+                    changed()
+                end })
+        end
+    end
     return form:Finish()
 end
 

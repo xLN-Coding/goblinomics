@@ -154,4 +154,45 @@ describe("Workshop: concentration and cooldowns", function()
         card.refresh(f, {})
         assert.is_truthy(f.lines[1].left:GetText():find("Alt"))
     end)
+
+    it("toasts once when an entry becomes due, prints due entries at login and fills the tooltip", function()
+        local toasts = {}
+        ns.Toast.Show = function(spec) toasts[#toasts + 1] = spec end
+        local root = GoblinomicsWorkshopDB
+        local N = wns.ProfessionNotices
+        root.chars["Alt-Realm"] = { name = "Alt", professions = { [2901] = { name = "Blacksmithing", amount = 1000,
+            max = 1000, cycleSec = 360, readAt = WoWMock.now } } }
+        char().professions = { [2900] = { name = "Alchemy", amount = 998, max = 1000, cycleSec = 360, readAt = WoWMock.now } }
+        local line = N.LoginLine(root, root.settings, WoWMock.now)
+        assert.is_truthy(line:find("Alt %(Blacksmithing%)"))
+        assert.is_falsy(line:find("Alchemy"))
+        local left, right = N.TooltipText(root, root.settings, WoWMock.now)
+        assert.equals("Concentration & cooldowns", left)
+        assert.is_truthy(right:find("1 ready"))
+        assert.is_truthy(right:find("next in 12m"))
+        -- the login marks what is due already; only the Alchemy becomes due later
+        for k in pairs(WoWMock.chat) do WoWMock.chat[k] = nil end
+        WoWMock.advance(7)
+        WoWMock.flush()
+        assert.is_truthy(WoWMock.chat[1] and WoWMock.chat[1]:find("Blacksmithing"))
+        assert.equals(0, #toasts)
+        WoWMock.advance(2 * 360)
+        WoWMock.flush()
+        assert.equals(1, #toasts)
+        assert.is_truthy(toasts[1].text:find("Alchemy"))
+        N.Check()
+        assert.equals(1, #toasts)                                     -- once per due time
+        root.settings.notifyTooltip = false
+        GameTooltip:SetOwner(UIParent)
+        ns.UI.FillTooltipProviders(GameTooltip)
+        for _, l in ipairs(GameTooltip.lines) do assert.is_falsy(tostring(l.left or l[1] or ""):find("Concentration")) end
+        assert.is_nil(N.LoginLine({ chars = {} }, {}, WoWMock.now))
+    end)
+
+    it("builds the settings with the threshold, the notice switches and the characters", function()
+        char().professions = { [2900] = { name = "Alchemy", amount = 1, readAt = 1 } }
+        local section
+        for _, s in ipairs(ns.UI.SortedSettings()) do if s.id == "workshop" then section = s end end
+        assert.is_true(section.build(CreateFrame("Frame"), 0) > 200)
+    end)
 end)

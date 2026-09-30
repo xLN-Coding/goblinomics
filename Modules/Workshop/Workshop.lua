@@ -34,7 +34,7 @@ local Workshop = API.RegisterModule(ADDON_NAME, {
 ns.Workshop = Workshop
 
 local PARTS = { "Recipes", "Reagents", "Purchases", "CraftTracker", "Lots", "Orders", "Concentration", "Salvage",
-    "Stats", "Retention", "Recompute", "Professions",
+    "Stats", "Retention", "Recompute", "Professions", "ProfessionNotices",
     "WorkshopSummary", "WorkshopUI", "WorkshopProfessions" }
 
 function Workshop:OnInit()
