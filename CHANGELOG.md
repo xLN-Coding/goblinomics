@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.2-beta] - 2026-09-30
 
 ### Added
 - Concentration and recipe cooldowns for all your characters, in a new
