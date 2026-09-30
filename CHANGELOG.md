@@ -13,7 +13,6 @@
   threshold) or a cooldown is ready: a toast while you play, a chat line after
   login and a line in the minimap tooltip. Each can be switched off, and single
   characters can be left out.
-- `/gob professions` lists what was found for the current character.
 
 ### Changed
 - The Workshop is easier to read. Sub-tabs at the top (Overview, Recipes,

@@ -52,6 +52,14 @@ describe("Code rules", function()
         assert.same({}, hits)
     end)
 
+    it("uses only the public API from module addons (ns there is the module's own namespace)", function()
+        local hits = {}
+        local p = io.popen("grep -rnE '(^|[^A-Za-z0-9_])ns\\.(Print|Lf|Timer|Bus|Events|Price|Modules)([^A-Za-z0-9_]|$)' Modules Connectors")
+        for line in p:lines() do hits[#hits + 1] = line end
+        p:close()
+        assert.same({}, hits)
+    end)
+
     it("calls the farming module Gatherer (Prospector only in the core migration)", function()
         local hits = {}
         local p = io.popen("grep -rniIl prospector Core Modules Connectors Locales")

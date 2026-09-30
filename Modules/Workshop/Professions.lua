@@ -320,21 +320,6 @@ local function OnCrafted(record)
     end
 end
 
---- Chat lines for /gob professions: what was found for this character.
-local function Command()
-    local c = Char()
-    local out = {}
-    for id, p in pairs(c and c.professions or {}) do
-        out[#out + 1] = ("%s: line %d, currency %s, %s/%s, %ss per %s"):format(p.name or "?", id, tostring(p.currencyID),
-            tostring(p.amount), tostring(p.max), tostring(p.cycleSec), tostring(p.perCycle))
-    end
-    for id, cd in pairs(c and c.cooldowns or {}) do
-        out[#out + 1] = ("%s (%d): ready in %ds"):format(cd.name or "?", id, math.max(0, (cd.readyAt or 0) - Now()))
-    end
-    if #out == 0 then out[1] = API.L["No profession data yet: open a profession window once."] end
-    for _, line in ipairs(out) do ns.Print(line) end
-end
-
 function Professions.Enable(m)
     module = m
     local c = m.db.char
@@ -349,7 +334,6 @@ function Professions.Enable(m)
         Professions.ReadStored()
         Professions.ReadStoredCooldowns()
     end)
-    API.RegisterCommand("professions", Command, API.L["concentration and cooldowns found for this character"])
 end
 
 function Professions.Disable()
