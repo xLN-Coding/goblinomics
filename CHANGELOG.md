@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Concentration and recipe cooldowns for all your characters, in a new
+  "Concentration & cooldowns" view in the Workshop and a dashboard card.
+  Goblinomics reads a character's concentration when you log in or open a
+  profession window and works out from the recharge rate when it's full again,
+  so you don't have to log in every alt to check. Cooldowns such as transmutes
+  show when they're ready, recipes with charges show how many are back.
+- Notices when a character's concentration is full (or reaches your own
+  threshold) or a cooldown is ready: a toast while you play, a chat line after
+  login and a line in the minimap tooltip. Each can be switched off, and single
+  characters can be left out.
+- `/gob professions` lists what was found for the current character.
+
+### Changed
+- The Workshop is easier to read. Sub-tabs at the top (Overview, Recipes,
+  Crafting orders, Salvage, Concentration & cooldowns) replace the long list on
+  the left. Recipes are a table you can sort and search, and a click opens the
+  details. The overview shows the important numbers in a few cards.
+
 ## [0.9.1-beta] - 2026-09-28
 
 ### Added
