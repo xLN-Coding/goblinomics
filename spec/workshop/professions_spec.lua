@@ -2,7 +2,7 @@
 describe("Workshop: concentration and cooldowns", function()
     after_each(function() assert.same({}, WoWMock.errors) end)
 
-    local wns, P
+    local ns, wns, P
 
     local function install()
         WoWMock.childProfessions = {
@@ -23,8 +23,8 @@ describe("Workshop: concentration and cooldowns", function()
     end
 
     before_each(function()
-        local _
-        _, wns = load_workshop({ before = install })
+
+        ns, wns = load_workshop({ before = install })
         P = wns.Professions
     end)
 
@@ -116,5 +116,42 @@ describe("Workshop: concentration and cooldowns", function()
         assert.equals("Alt-Realm", due[1].char)                      -- already above the threshold
         assert.equals(now, due[1].at)
         assert.equals(now + 50 * 360, due[2].at)
+    end)
+
+    it("shows the view in the Workshop and the dashboard card, filtered and foldable", function()
+        local root = GoblinomicsWorkshopDB
+        root.chars["Alt-Realm"] = { name = "Alt", class = "MAGE", professions = { [2901] = { name = "Blacksmithing",
+            amount = 990, max = 1000, cycleSec = 360, readAt = WoWMock.now } },
+            cooldowns = { [700] = { name = "Transmute: Ore", readyAt = WoWMock.now - 5 } } }
+        char().professions = { [2900] = { name = "Alchemy", amount = 100, max = 1000, cycleSec = 360, readAt = WoWMock.now } }
+        local V = wns.WorkshopProfessions
+        local overview = P.Overview(root, {}, WoWMock.now)
+        local rows = V.Rows(overview, {})
+        assert.same({ "char", "profession", "cooldown", "char", "profession" },
+            { rows[1].kind, rows[2].kind, rows[3].kind, rows[4].kind, rows[5].kind })
+        assert.equals("Alt-Realm", rows[1].entry.key)                 -- the transmute is ready
+        assert.equals(3, #V.Rows(overview, { char = "Alt-Realm" }))
+        assert.equals(2, #V.Rows(overview, { profession = "Blacksmithing" }))   -- no cooldowns under a profession filter
+        assert.equals(2, #V.Rows(overview, { profession = "Alchemy" }))
+        V.collapsed["Alt-Realm"] = true
+        assert.equals(3, #V.Rows(overview, {}))
+        V.collapsed["Alt-Realm"] = nil
+
+        local tab = ns.UI.GetTab("workshop")
+        tab.build(CreateFrame("Frame"))
+        tab.onShow()
+        wns.WorkshopUI.Show("professions")
+        assert.equals(5, #wns.WorkshopUI.CurrentPage().rows)
+        WoWMock.advance(61)
+        WoWMock.flush()
+        tab.onHide()
+
+        local card
+        for _, w in ipairs(ns.UI.SortedWidgets()) do if w.id == "workshop.concentration" then card = w end end
+        assert.is_table(card)
+        local f = CreateFrame("Frame")
+        card.build(f)
+        card.refresh(f, {})
+        assert.is_truthy(f.lines[1].left:GetText():find("Alt"))
     end)
 end)

@@ -27,3 +27,4 @@ WorkshopUI.lua
 WorkshopSummary.lua
 WorkshopRecipes.lua
 WorkshopDetail.lua
+WorkshopProfessions.lua

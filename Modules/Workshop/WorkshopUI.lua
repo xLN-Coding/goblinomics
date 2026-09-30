@@ -310,12 +310,14 @@ function UI.Enable(m)
         build = BuildTab,
         onShow = function()
             UI.Refresh()
-            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER" }) do
+            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS" }) do
                 API.On(event, UI.Refresh, OWNER)
             end
         end,
         onHide = function()
-            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER" }) do API.Off(event, OWNER) end
+            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS" }) do
+                API.Off(event, OWNER)
+            end
         end,
     })
     API.UI:RegisterSettings({ id = "workshop", title = function() return L["Workshop"] end, order = 50,

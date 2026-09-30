@@ -68,9 +68,21 @@ function Format.Day(key, style)
     return t and Format.Date(t, style) or tostring(key or "")
 end
 
+--- Time span in words: "2d 4h", "3h 12m", "12m" (translated).
+function Format.Remaining(seconds)
+    local Lf = ns.API.Lf
+    seconds = math.max(0, seconds or 0)
+    local days, hours = math.floor(seconds / 86400), math.floor(seconds % 86400 / 3600)
+    local minutes = math.floor(seconds % 3600 / 60)
+    if days > 0 then return Lf("%dd %dh", days, hours) end
+    if hours > 0 then return Lf("%dh %dm", hours, minutes) end
+    return Lf("%dm", minutes)
+end
+
 ns.API.Format = {
     Number = function(_, n, d) return Format.Number(n, d) end,
     Percent = function(_, s, d) return Format.Percent(s, d) end,
     Date = function(_, t, style) return Format.Date(t, style) end,
     Day = function(_, key, style) return Format.Day(key, style) end,
+    Remaining = function(_, seconds) return Format.Remaining(seconds) end,
 }

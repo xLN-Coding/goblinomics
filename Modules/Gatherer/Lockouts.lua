@@ -128,15 +128,9 @@ function Lockouts.Grid(farm)
     return result
 end
 
---- "2d 4h", "3h 12m", "12m"
+--- "2d 4h", "3h 12m", "12m" (the shared format).
 function Lockouts.FormatRemaining(seconds)
-    local API = ns.API
-    seconds = math.max(0, seconds)
-    local days, hours = math.floor(seconds / 86400), math.floor(seconds % 86400 / 3600)
-    local minutes = math.floor(seconds % 3600 / 60)
-    if days > 0 then return API.Lf("%dd %dh", days, hours) end
-    if hours > 0 then return API.Lf("%dh %dm", hours, minutes) end
-    return API.Lf("%dm", minutes)
+    return ns.API.Format:Remaining(seconds)
 end
 
 --- Cell text: green "free" (or 0/N), yellow partial "5/10", red cleared "10/10".
