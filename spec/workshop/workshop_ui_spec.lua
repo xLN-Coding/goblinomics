@@ -37,42 +37,54 @@ describe("Workshop UI", function()
         assert.is_true(ns.UI.SortedSettings()[3].build(CreateFrame("Frame"), 0) > 60)
     end)
 
-    it("lists summary, orders, salvage and the recipes by profit; qualities expand", function()
+    it("lists the recipes in a sortable, searchable table; qualities expand", function()
         S.craft(100, {}, { { S.result({ id = 502, quality = 2 }) }, { S.result({ id = 501, quality = 1 }) } })
         S.craft(110, {}, { { S.result({ id = 512, quality = 2 }) } })
         wns.Lots.Sell("i:512", 1, 5000)
+        local R = wns.WorkshopRecipes
+        local recipes = wns.Stats.Recipes({})
+        local rows = R.Rows(recipes, { sort = "profit" })
+        assert.same({ 110, 100 }, { rows[1].recipe, rows[2].recipe })   -- Flask sold: highest profit first
+        assert.is_true(rows[2].expandable)
+        rows = R.Rows(recipes, { sort = "profit", reverse = true })
+        assert.equals(100, rows[1].recipe)
+        rows = R.Rows(recipes, { sort = "crafts" })
+        assert.equals(100, rows[1].recipe)                              -- two crafts before one
+        assert.equals(1, #R.Rows(recipes, { search = "flask" }))
+        rows = R.Rows(recipes, { sort = "profit", expanded = { [100] = true } })
+        assert.equals(4, #rows)
+        assert.equals("quality", rows[3].kind)
+        assert.equals(2, rows[3].quality)
+        assert.is_nil(R.Margin({ soldCost = 0, profit = 5 }))
+        assert.equals(50, R.Margin({ soldCost = 100, profit = 50 }))
+    end)
+
+    it("switches the views with the sub-tabs and opens recipe details in a dialog", function()
+        S.craft(100, {}, { { S.result({ id = 502, quality = 2, conc = 20 }) }, { S.result({ id = 501, quality = 1 }) } })
+        wns.Lots.Sell("i:502", 1, 2000)
         S.craft(300, {}, { { S.result({ id = 950 }) } }, { call = function()
             C_TradeSkillUI.CraftSalvage(300, 1, { itemID = 900 }, {})
         end })
-        local UI = wns.WorkshopUI
-        local kinds = {}
-        for _, r in ipairs(UI.ListRows()) do kinds[#kinds + 1] = r.kind end
-        assert.same({ "summary", "orders", "salvage", "header", "recipe", "recipe" }, kinds)
-        local rows = UI.ListRows()
-        assert.equals(110, rows[5].recipe)          -- Flask sold: highest profit first
-        assert.is_true(rows[6].expandable)
-        UI.state.expanded[100] = true
-        assert.equals(8, #UI.ListRows())
-    end)
-
-    it("switches the right side with the selection and builds every page", function()
-        S.craft(100, {}, { { S.result({ id = 502, quality = 2, conc = 20 }) }, { S.result({ id = 501, quality = 1 }) } })
-        wns.Lots.Sell("i:502", 1, 2000)
         build()
         local UI = wns.WorkshopUI
-        assert.equals("summary", UI.state.selected.kind)
+        assert.equals("overview", UI.state.view)
         assert.is_true(UI.CurrentPage().frame:IsShown())
-        UI.Select({ kind = "recipe", recipe = 100 })
-        local page = UI.CurrentPage()
+        for _, id in ipairs({ "recipes", "orders", "salvage", "overview" }) do
+            UI.Show(id)
+            assert.equals(id, UI.state.view)
+            assert.is_true(UI.CurrentPage().frame:IsShown())
+        end
+        assert.equals("overview", GoblinomicsWorkshopDB.settings.view)
+        UI.Show("recipes")
+        assert.equals(1, #UI.CurrentPage().rows)
+        UI.OpenRecipe(100)
+        local page = UI.DetailPage()
         assert.equals(2, page.detail.crafts)
         assert.equals(3, #page.detail.history)
-        UI.Select({ kind = "quality", recipe = 100, quality = 2 })
-        assert.equals(page, UI.CurrentPage())
+        UI.OpenRecipe(100, 2)
         assert.equals(1, page.detail.crafts)
-        UI.Select({ kind = "orders" })
-        UI.Select({ kind = "salvage" })
         UI.state.profession = "Tailoring"
-        UI.Select({ kind = "recipe", recipe = 100 })
-        assert.equals("summary", UI.state.selected.kind)   -- the recipe is not in the filter
+        UI.Refresh()
+        assert.equals(0, #UI.CurrentPage().rows)
     end)
 end)

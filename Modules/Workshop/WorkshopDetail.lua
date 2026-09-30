@@ -1,12 +1,13 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/WorkshopDetail.lua
--- Compact pages of the Workshop tab:
---   recipe   head, key figures, cost per craft by reagent (share bars,
---            resourcefulness savings), history of crafts and sales; filtered
---            to one quality when a quality row is selected
---   orders   key figures and the fulfilled orders (tooltip: commission,
---            rewards, counted reagents; right-click: count without own cost)
---   salvage  key figures and one row per salvaged item on a cash basis:
+-- Pages of the Workshop tab:
+--   recipe   the recipe details dialog: head, key figures, cost per craft by
+--            reagent (share bars, resourcefulness savings), history of crafts
+--            and sales; filtered to one quality when opened from a quality row
+--   orders   "Crafting orders" view: a card with the key figures and the
+--            fulfilled orders (tooltip: commission, rewards, counted reagents;
+--            right-click: count without own cost)
+--   salvage  "Salvage" view: a key figure card and one row per salvaged item on a cash basis:
 --            revenue of sold yields plus the cost share of yields used in
 --            crafts, minus all costs of the operations
 local _, ns = ...
@@ -54,12 +55,11 @@ local function Highlight(row)
 end
 
 local function Header(parent, y, specs, titles)
-    local S = ns.API.Theme.space
     local set = ColumnSet(specs, titles)
     local h = set:Header(parent)
     for i, cell in ipairs(h.cells) do cell.label:SetText((titles[i] or ""):upper()) end
     h:SetPoint("TOPLEFT", 0, y)
-    h:SetPoint("RIGHT", parent, "RIGHT", -S.GUTTER, 0)
+    h:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
     return h
 end
 
@@ -193,15 +193,14 @@ function Detail.BuildOrders(parent)
     local C = Theme.colors
     local page = Page(parent)
     local f = page.frame
-    UI.Section(f, L["Crafting orders"], 0, 0)
-    page.stats = {
-        count = UI.Stat(f, 0, -18, L["Orders"], 80),
-        commission = UI.Stat(f, 86, -18, L["Commission"], 80),
-        rewards = UI.Stat(f, 172, -18, L["Rewards"], 80),
-        cost = UI.Stat(f, 258, -18, L["Own cost"], 80),
-        profit = UI.Stat(f, 344, -18, L["Profit"], 80),
-    }
-    Header(f, -56, ORDER_COLS, { L["Order"], L["Commission"], L["Own cost"], L["Profit"] })
+    local S = Theme.space
+    local card, height
+    card, page.stats, height = UI.KeyFigures(f, { { "count", L["Orders"] }, { "income", L["Income"] },
+        { "cost", L["Own cost"] }, { "profit", L["Profit"] } })
+    card:SetPoint("TOPLEFT", 0, 0)
+    card:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    local top = -(height + S.GAP)
+    Header(f, top, ORDER_COLS, { L["Order"], L["Income"], L["Own cost"], L["Profit"] })
     page.list = W.ScrollList(f, { rowHeight = 32, init = function(row, o)
         if not row.first then
             row.first, row.cells = Columns(row, ORDER_COLS)
@@ -251,8 +250,8 @@ function Detail.BuildOrders(parent)
             .. (o.incomplete and " " .. CODE.gold .. "*|r" or ""))
         row.cells[3]:SetText(UI.Money(o.profit, { color = true, sign = true }))
     end })
-    page.list.box:SetPoint("TOPLEFT", 0, -74)
-    page.list.box:SetPoint("BOTTOMRIGHT", -14, 0)
+    page.list.box:SetPoint("TOPLEFT", 0, top - S.HEADER_H - S.XS)
+    page.list.box:SetPoint("BOTTOMRIGHT", 0, 0)
     page.empty = W.EmptyState(page.list.box, L["No fulfilled crafting orders in this period."])
 
     function page.Refresh(filter)
@@ -265,8 +264,7 @@ function Detail.BuildOrders(parent)
             profit = profit + (o.profit or 0)
         end
         page.stats.count:SetText(tostring(#orders))
-        page.stats.commission:SetText(UI.Money(commission))
-        page.stats.rewards:SetText(UI.Money(rewards))
+        page.stats.income:SetText(UI.Money(commission + rewards))
         page.stats.cost:SetText(UI.Money(cost))
         page.stats.profit:SetText(UI.Money(profit, { color = true, sign = true }))
         page.list:SetData(orders)
@@ -281,16 +279,16 @@ local SALVAGE_COLS = { 50, 70, 70, 76 }
 function Detail.BuildSalvage(parent)
     local API, L, UI = ns.API, ns.L, ns.WorkshopUI
     local W = API.Widgets
+    local S = API.Theme.space
     local page = Page(parent)
     local f = page.frame
-    UI.Section(f, L["Salvage"], 0, 0)
-    page.stats = {
-        ops = UI.Stat(f, 0, -18, L["Operations"], 100),
-        cost = UI.Stat(f, 108, -18, L["Cost"], 100),
-        sold = UI.Stat(f, 216, -18, L["Income"], 100),
-        profit = UI.Stat(f, 324, -18, L["Profit"], 100),
-    }
-    Header(f, -56, SALVAGE_COLS, { L["Salvaged item"], L["Operations"], L["Cost"], L["Income"], L["Profit"] })
+    local card, height
+    card, page.stats, height = UI.KeyFigures(f, { { "ops", L["Operations"] }, { "cost", L["Cost"] },
+        { "sold", L["Income"] }, { "profit", L["Profit"] } })
+    card:SetPoint("TOPLEFT", 0, 0)
+    card:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    local top = -(height + S.GAP)
+    Header(f, top, SALVAGE_COLS, { L["Salvaged item"], L["Operations"], L["Cost"], L["Income"], L["Profit"] })
     page.list = W.ScrollList(f, { rowHeight = ROW_H + 2, init = function(row, s)
         if not row.first then
             row.first, row.cells = Columns(row, SALVAGE_COLS)
@@ -317,8 +315,8 @@ function Detail.BuildSalvage(parent)
         row.cells[3]:SetText(income > 0 and UI.Money(income) or CODE.dim .. "-|r")
         row.cells[4]:SetText(UI.Money(s.profit, { color = true, sign = true }))
     end })
-    page.list.box:SetPoint("TOPLEFT", 0, -74)
-    page.list.box:SetPoint("BOTTOMRIGHT", -14, 0)
+    page.list.box:SetPoint("TOPLEFT", 0, top - S.HEADER_H - S.XS)
+    page.list.box:SetPoint("BOTTOMRIGHT", 0, 0)
     page.empty = W.EmptyState(page.list.box, L["No salvage in this period."])
 
     function page.Refresh(filter)

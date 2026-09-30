@@ -1,27 +1,24 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/WorkshopUI.lua
--- Workshop tab, master-detail:
---   left   a slim list: Summary, Orders, Salvage, then the recipes by realized
---          profit; "+" expands a recipe into its quality tiers
---   right  the page for the selection (WorkshopSummary, WorkshopDetail)
--- Filters on top: period, profession, character. Shared helpers for the pages
--- live here (money, item labels, quality marks, small stat blocks). Plus the
+-- Workshop tab: sub-tabs Overview, Recipes, Crafting orders, Salvage (and views
+-- other parts add, e.g. concentration and cooldowns), one filter row below them
+-- (period, profession, character), the selected view below that. A recipe opens
+-- its details (cost per craft, history) in a dialog. Shared helpers for the
+-- views live here (money, item labels, quality marks, key figure cards). Plus the
 -- "Workshop" settings section and the dashboard card.
 local _, ns = ...
-local CODE = setmetatable({}, { __index = function(_, k) return ns.API.Theme.CODE[k] end })
 
 local UI = {}
 ns.WorkshopUI = UI
 
 local OWNER = "Goblinomics_Workshop.Tab"
-local ROW_H = 22
-local LIST_W = 250
 local ALL = "all"
 
 local API, L
 local module
 local tab = {}
-local state = { period = 30, profession = ALL, char = ALL, expanded = {}, selected = { kind = "summary" } }
+local state = { view = "overview", period = 30, profession = ALL, char = ALL, expanded = {},
+    sort = "profit", reverse = false, search = "" }
 UI.state = state
 
 -- Helpers shared by the pages --------------------------------------------------------
@@ -77,6 +74,29 @@ function UI.Section(parent, text, x, y)
     return fs
 end
 
+--- Card with 3-4 large key figures side by side; returns card, { key = value fontstring } and its height.
+-- items = { { key, label } }; every figure gets `width` (default 140).
+function UI.KeyFigures(parent, items, width)
+    local Theme = API.Theme
+    local C, S = Theme.colors, Theme.space
+    local card = API.Widgets.Card(parent)
+    local height = S.PAD * 2 + 34
+    card:SetHeight(height)
+    local values = {}
+    for i, item in ipairs(items) do
+        local x = (i - 1) * ((width or 140) + S.GAP)
+        local l = Theme.Text(card.body, "caption", C.textDim)
+        l:SetPoint("TOPLEFT", x, 0)
+        l:SetText(item[2]:upper())
+        local v = Theme.Text(card.body, "value", C.text)
+        v:SetPoint("TOPLEFT", x, -14)
+        v:SetWidth(width or 140)
+        v:SetWordWrap(false)
+        values[item[1]] = v
+    end
+    return card, values, height
+end
+
 --- "Sold crafts x, Crafting orders y (, Salvage z)" with coloured amounts.
 function UI.BreakdownText(b, separator)
     local parts = {
@@ -95,158 +115,84 @@ function UI.Filter()
         char = state.char ~= ALL and state.char or nil }
 end
 
--- Left list --------------------------------------------------------------------------
---- Rows of the left list for the current filter.
-function UI.ListRows()
-    local filter = UI.Filter()
-    local rows = {}
-    local b = ns.Stats.Breakdown(filter)
-    rows[#rows + 1] = { kind = "summary", value = b.total }
-    rows[#rows + 1] = { kind = "orders", value = b.orders }
-    local salvage = ns.Salvage.Rows(filter)
-    if #salvage > 0 or b.salvage ~= 0 then rows[#rows + 1] = { kind = "salvage", value = b.salvage } end
-    local recipes = ns.Stats.Recipes(filter)
-    if #recipes > 0 then rows[#rows + 1] = { kind = "header" } end
-    for _, r in ipairs(recipes) do
-        rows[#rows + 1] = { kind = "recipe", recipe = r.recipe, row = r, value = r.profit,
-            expandable = #r.qualityList > 1 }
-        if state.expanded[r.recipe] and #r.qualityList > 1 then
-            for _, q in ipairs(r.qualityList) do
-                rows[#rows + 1] = { kind = "quality", recipe = r.recipe, quality = q.quality, row = q, value = q.profit }
-            end
-        end
+-- Views ------------------------------------------------------------------------------
+-- Sub-tabs of the Workshop; build(parent) returns { frame, Refresh(filter) }.
+-- noPeriod: the period filter does not apply (it is hidden for that view).
+local VIEWS = {
+    { id = "overview", label = function() return L["Overview"] end,
+        build = function(parent) return ns.WorkshopSummary.Build(parent) end },
+    { id = "recipes", label = function() return L["Recipes"] end,
+        build = function(parent) return ns.WorkshopRecipes.Build(parent) end },
+    { id = "orders", label = function() return L["Crafting orders"] end,
+        build = function(parent) return ns.WorkshopDetail.BuildOrders(parent) end },
+    { id = "salvage", label = function() return L["Salvage"] end,
+        build = function(parent) return ns.WorkshopDetail.BuildSalvage(parent) end },
+}
+UI.VIEWS = VIEWS
+
+local function View(id)
+    for _, v in ipairs(VIEWS) do if v.id == id then return v end end
+    return VIEWS[1]
+end
+
+--- Register a further view (e.g. concentration and cooldowns), shown after the others.
+function UI.AddView(spec)
+    for i, v in ipairs(VIEWS) do
+        if v.id == spec.id then VIEWS[i] = spec return end
     end
-    return rows
+    VIEWS[#VIEWS + 1] = spec
 end
 
-local function IsSelected(data)
-    local sel = state.selected
-    if sel.kind ~= data.kind then return false end
-    if data.kind == "recipe" then return sel.recipe == data.recipe end
-    if data.kind == "quality" then return sel.recipe == data.recipe and sel.quality == data.quality end
-    return true
-end
-
-function UI.Select(selection)
-    if selection.kind == "quality" then state.expanded[selection.recipe] = true end
-    state.selected = selection
-    UI.Refresh()
-end
-
-local function RowLabel(data)
-    if data.kind == "summary" then return L["Summary"], nil end
-    if data.kind == "orders" then return L["Crafting orders"], nil end
-    if data.kind == "salvage" then return L["Salvage"], nil end
-    if data.kind == "header" then return L["Recipes"], nil end
-    if data.kind == "quality" then
-        return UI.QualityMark(data.quality) .. "  " .. L["Quality"] .. " " .. data.quality, nil
-    end
-    local r = data.row
-    local label = r.output and (UI.ItemLabel(r.output)) or (r.name or "?")
-    return label .. (r.incomplete and " " .. CODE.gold .. "*|r" or ""), r.output
-end
-
-local function InitListRow(row, data)
-    if not row.name then
-        local Theme = API.Theme
-        API.Widgets.RowBackground(row)
-        row.toggle = CreateFrame("Button", nil, row)
-        row.toggle:SetSize(16, ROW_H)
-        row.toggle:SetPoint("LEFT", 0, 0)
-        row.toggle.label = Theme.Text(row.toggle, "body", Theme.colors.textDim)
-        row.toggle.label:SetPoint("CENTER")
-        row.toggle:SetScript("OnClick", function()
-            local d = row.data
-            state.expanded[d.recipe] = not state.expanded[d.recipe] or nil
-            UI.Refresh()
-        end)
-        row.icon = row:CreateTexture(nil, "ARTWORK")
-        row.icon:SetSize(16, 16)
-        row.name = Theme.Text(row, "body", Theme.colors.text)
-        row.name:SetWordWrap(false)
-        row.value = Theme.Text(row, "small", Theme.colors.text)
-        row.value:SetPoint("RIGHT", -4, 0)
-        row.value:SetJustifyH("RIGHT")
-        row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
-        row:SetScript("OnClick", function(self)
-            local d = self.data
-            if d.kind == "header" then return end
-            if self.link and IsModifiedClick and IsModifiedClick() and HandleModifiedItemClick then
-                HandleModifiedItemClick(self.link)
-                return
-            end
-            UI.Select({ kind = d.kind, recipe = d.recipe, quality = d.quality })
-        end)
-        row:SetScript("OnEnter", function(self)
-            if self.link then API.Widgets.ShowItemTooltip(self, self.link) end
-        end)
-        row:SetScript("OnLeave", API.Widgets.HideTooltip)
-    end
-    row.data = data
-    local C = API.Theme.colors
-    local selected = IsSelected(data)
-    local header = data.kind == "header"
-    row.zebra:SetShown(not header and not selected)
-    API.Widgets.MarkSelected(row, selected)
-    local label, link = RowLabel(data)
-    row.link = link
-    row.toggle:SetShown(data.kind == "recipe" and data.expandable)
-    row.toggle.label:SetText(state.expanded[data.recipe] and "-" or "+")
-    local indent = (data.kind == "quality") and 30 or 16
-    row.icon:ClearAllPoints()
-    row.icon:SetPoint("LEFT", indent, 0)
-    row.icon:SetShown(data.kind == "recipe")
-    if data.kind == "recipe" then row.icon:SetTexture(UI.ItemIcon(data.row.output)) end
-    row.name:ClearAllPoints()
-    row.name:SetPoint("LEFT", data.kind == "recipe" and 38 or (header and 4 or indent), 0)
-    row.name:SetPoint("RIGHT", row.value, "LEFT", -6, 0)
-    row.name:SetText(header and label:upper() or label)
-    row.name:SetTextColor(unpack(header and C.textDim or C.text))
-    row.name:SetFontObject(API.Theme.Font(API.Theme.SIZE[header and "caption" or "body"]))
-    row.value:SetText(data.value and Money(data.value, { color = true, sign = true }) or "")
-end
-
--- Right side -------------------------------------------------------------------------
-local function Page(kind)
+local function Page(id)
     tab.pages = tab.pages or {}
-    local page = tab.pages[kind]
-    if page then return page end
-    if kind == "summary" then
-        page = ns.WorkshopSummary.Build(tab.right)
-    elseif kind == "orders" then
-        page = ns.WorkshopDetail.BuildOrders(tab.right)
-    elseif kind == "salvage" then
-        page = ns.WorkshopDetail.BuildSalvage(tab.right)
-    else
-        page = ns.WorkshopDetail.BuildRecipe(tab.right)
+    local page = tab.pages[id]
+    if not page then
+        page = View(id).build(tab.content)
+        tab.pages[id] = page
     end
-    tab.pages[kind] = page
     return page
 end
 
+function UI.Show(id)
+    state.view = View(id).id
+    if module then module.db.settings.view = state.view end
+    UI.Refresh()
+end
+
 function UI.Refresh()
-    if not tab.list then return end
-    local filter = UI.Filter()
-    local rows = UI.ListRows()
-    -- a recipe that disappeared from the filter falls back to the summary
-    local sel = state.selected
-    if sel.kind == "recipe" or sel.kind == "quality" then
-        local found = false
-        for _, r in ipairs(rows) do if IsSelected(r) then found = true end end
-        if not found then state.selected = { kind = "summary" } end
-    end
-    tab.list:SetData(rows)
-    local kind = state.selected.kind == "quality" and "recipe" or state.selected.kind
-    for k, page in pairs(tab.pages or {}) do page.frame:SetShown(k == kind) end
-    local page = Page(kind)
+    if not tab.content then return end
+    local view = View(state.view)
+    state.view = view.id
+    tab.views:Refresh()
+    tab.period:SetShown(not view.noPeriod)
+    for id, page in pairs(tab.pages or {}) do page.frame:SetShown(id == view.id) end
+    local page = Page(view.id)
     page.frame:Show()
-    page.Refresh(filter, state.selected)
+    page.Refresh(UI.Filter())
+    if tab.detail and tab.detail:IsShown() then UI.RefreshRecipe() end
 end
 
 function UI.CurrentPage()
-    local kind = state.selected.kind == "quality" and "recipe" or state.selected.kind
-    return tab.pages and tab.pages[kind]
+    return tab.pages and tab.pages[state.view]
 end
+
+-- Recipe details: a dialog with the recipe page (cost per craft, history).
+function UI.OpenRecipe(recipe, quality)
+    state.detail = { recipe = recipe, quality = quality }
+    if not tab.detail then
+        tab.detail = API.Widgets.Dialog({ title = L["Recipe"], width = 560, height = 470, name = "GoblinomicsWorkshopRecipe" })
+        tab.detailPage = ns.WorkshopDetail.BuildRecipe(tab.detail.body)
+    end
+    tab.detail:Show()
+    UI.RefreshRecipe()
+end
+
+function UI.RefreshRecipe()
+    if not tab.detailPage or not state.detail then return end
+    tab.detailPage.Refresh(UI.Filter(), state.detail)
+end
+
+function UI.DetailPage() return tab.detailPage end
 
 local function Choices(field)
     local seen = {}
@@ -266,38 +212,41 @@ local function Choices(field)
     return list
 end
 
+--- Header: the sub-tabs, below them one filter row for every view (period left,
+-- profession and character right); the views fill the space below.
 local function BuildTab(page)
     local W = API.Widgets
     local Theme = API.Theme
     local S = Theme.space
-    local period = API.Periods:Control(page, function() return state.period end, function(value)
+    local filterY = -(S.CONTROL_H + S.SM)
+    local headerH = 2 * S.CONTROL_H + S.SM
+    state.view = module.db.settings.view or state.view
+    tab.views = W.Segmented(page, function()
+        local list = {}
+        for _, v in ipairs(VIEWS) do list[#list + 1] = { value = v.id, label = v.label() } end
+        return list
+    end, function() return state.view end, function(value) UI.Show(value) end, { min = 80 })
+    tab.views:SetPoint("TOPLEFT", 0, 0)
+    tab.period = API.Periods:Control(page, function() return state.period end, function(value)
         state.period = value
         UI.Refresh()
     end, true)
-    period:SetPoint("TOPLEFT", 0, 0)
+    tab.period:SetPoint("TOPLEFT", 0, filterY)
     local x = -S.GUTTER
     local function dropdown(choices, field)
         local d = W.Dropdown(page, choices, function() return state[field] end, function(value)
             state[field] = value
             UI.Refresh()
         end, { size = "M" })
-        d:SetPoint("TOPRIGHT", page, "TOPRIGHT", x, 0)
+        d:SetPoint("TOPRIGHT", page, "TOPRIGHT", x, filterY)
         x = x - S.DROP_M - S.SM
     end
     dropdown(function() return Choices("char") end, "char")
     dropdown(function() return Choices("profession") end, "profession")
 
-    local listBg = CreateFrame("Frame", nil, page)
-    listBg:SetPoint("TOPLEFT", 0, S.CONTENT_TOP)
-    listBg:SetPoint("BOTTOMLEFT", 0, 0)
-    listBg:SetWidth(LIST_W)
-    Theme.Backdrop(listBg, Theme.colors.panel, Theme.colors.border)
-    tab.list = W.ScrollList(listBg, { rowHeight = ROW_H, init = InitListRow })
-    tab.list.box:SetPoint("TOPLEFT", 2, -2)
-    tab.list.box:SetPoint("BOTTOMRIGHT", -16, 2)
-    tab.right = CreateFrame("Frame", nil, page)
-    tab.right:SetPoint("TOPLEFT", LIST_W + S.MASTER_GAP, S.CONTENT_TOP)
-    tab.right:SetPoint("BOTTOMRIGHT", 0, 0)
+    tab.content = CreateFrame("Frame", nil, page)
+    tab.content:SetPoint("TOPLEFT", 0, -(headerH + S.GAP))
+    tab.content:SetPoint("BOTTOMRIGHT", -S.GUTTER, 0)
     UI.Refresh()
 end
 

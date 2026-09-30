@@ -1,10 +1,11 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/WorkshopSummary.lua
--- Summary page (graphic): realized profit large with the change against the
--- previous period and the split into sold crafts / crafting orders / salvage;
--- open stock (items, cost, current market value); profit per day as stacked
--- bars; top recipes by profit and the best recipes by concentration value per
--- point, plus one line per profession.
+-- "Overview" view of the Workshop, in cards: realized profit large with the
+-- change against the previous period and the split into sold crafts / crafting
+-- orders / salvage, and the open stock (items, cost, current market value);
+-- profit per day as stacked bars; top recipes by profit and the best recipes by
+-- concentration value per point, plus one line per profession. A click on a
+-- recipe opens its details.
 local _, ns = ...
 local CODE = setmetatable({}, { __index = function(_, k) return ns.API.Theme.CODE[k] end })
 
@@ -30,46 +31,43 @@ function Summary.Build(parent)
     f:SetAllPoints(parent)
     page.frame = f
 
-    -- key figures
-    local kpi = CreateFrame("Frame", nil, f)
+    local S = Theme.space
+
+    -- realized profit and open stock
+    local kpi = W.Card(f, L["Realized profit"])
     kpi:SetPoint("TOPLEFT", 0, 0)
     kpi:SetPoint("RIGHT", f, "RIGHT", 0, 0)
-    kpi:SetHeight(74)
-    Theme.Backdrop(kpi, C.panel, C.border)
-    local accent = kpi:CreateTexture(nil, "ARTWORK")
-    accent:SetColorTexture(unpack(C.gold))
-    accent:SetPoint("TOPLEFT")
-    accent:SetPoint("BOTTOMLEFT")
-    accent:SetWidth(3)
-    local profitLabel = Theme.Text(kpi, 10, C.textDim)
-    profitLabel:SetPoint("TOPLEFT", 12, -8)
-    profitLabel:SetText(L["Realized profit"]:upper())
-    page.total = Theme.Text(kpi, "value", C.gold)
-    page.total:SetPoint("TOPLEFT", 12, -22)
-    page.change = Theme.Text(kpi, 11, C.textDim)
-    page.change:SetPoint("LEFT", page.total, "RIGHT", 10, -2)
-    page.split = Theme.Text(kpi, 11, C.textDim)
-    page.split:SetPoint("BOTTOMLEFT", 12, 8)
-    page.split:SetPoint("RIGHT", kpi, "RIGHT", -170, 0)
+    kpi:SetHeight(92)
+    local body = kpi.body
+    page.total = Theme.Text(body, "hero", C.gold)
+    page.total:SetPoint("TOPLEFT", 0, 0)
+    page.change = Theme.Text(body, "body", C.textDim)
+    page.change:SetPoint("LEFT", page.total, "RIGHT", S.GAP, 0)
+    page.split = Theme.Text(body, "small", C.textDim)
+    page.split:SetPoint("BOTTOMLEFT", 0, 0)
+    page.split:SetPoint("RIGHT", body, "RIGHT", -170, 0)
     page.split:SetWordWrap(false)
-    local stockLabel = Theme.Text(kpi, 10, C.textDim)
-    stockLabel:SetPoint("TOPRIGHT", -12, -8)
+    local stockLabel = Theme.Text(body, "caption", C.textDim)
+    stockLabel:SetPoint("TOPRIGHT", 0, 0)
     stockLabel:SetText(L["Open stock"]:upper())
-    page.stockQty = Theme.Text(kpi, 16, C.text)
-    page.stockQty:SetPoint("TOPRIGHT", -12, -24)
+    page.stockQty = Theme.Text(body, "title", C.text)
+    page.stockQty:SetPoint("TOPRIGHT", 0, -14)
     page.stockQty:SetJustifyH("RIGHT")
-    page.stockValue = Theme.Text(kpi, 11, C.textDim)
-    page.stockValue:SetPoint("BOTTOMRIGHT", -12, 8)
+    page.stockValue = Theme.Text(body, "small", C.textDim)
+    page.stockValue:SetPoint("BOTTOMRIGHT", 0, 0)
     page.stockValue:SetJustifyH("RIGHT")
 
     -- profit per day
-    UI.Section(f, L["Profit per day"], 0, -86)
-    local legend = Theme.Text(f, 10, C.textDim)
-    legend:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -86)
+    local chartCard = W.Card(f, L["Profit per day"])
+    chartCard:SetPoint("TOPLEFT", kpi, "BOTTOMLEFT", 0, -S.GAP)
+    chartCard:SetPoint("RIGHT", f, "RIGHT", 0, 0)
+    chartCard:SetHeight(150)
+    local legend = Theme.Text(chartCard, "small", C.textDim)
+    legend:SetPoint("TOPRIGHT", chartCard, "TOPRIGHT", -S.PAD, S.CARD_TITLE_Y)
     legend:SetJustifyH("RIGHT")
     legend:SetText((CODE.good .. "%s|r  " .. CODE.gold .. "%s|r  " .. CODE.dim .. "%s|r"):format(L["Sold crafts"], L["Crafting orders"],
         L["Salvage"]))
-    page.chart = W.BarChart(f, {
+    page.chart = W.BarChart(chartCard.body, {
         width = 420, height = 100, gap = 2,
         series = { { key = "sales", color = C.accent }, { key = "orders", color = C.gold },
             { key = "salvage", color = C.neutral } },
@@ -83,56 +81,57 @@ function Summary.Build(parent)
             }
         end,
     })
-    page.chart:SetPoint("TOPLEFT", 0, -102)
-    page.chart:SetPoint("RIGHT", f, "RIGHT", 0, 0)
-    page.chartEmpty = Theme.Text(f, 11, C.textDim)
-    page.chartEmpty:SetPoint("TOPLEFT", 4, -140)
-    page.chartEmpty:SetText(L["No sales or orders in this period."])
+    page.chart:SetPoint("TOPLEFT", 0, 0)
+    page.chart:SetPoint("BOTTOMRIGHT", 0, 0)
+    page.chartEmpty = W.EmptyState(chartCard.body, L["No sales or orders in this period."])
 
-    -- top recipes and concentration
-    local left = CreateFrame("Frame", nil, f)
-    left:SetPoint("TOPLEFT", 0, -216)
-    left:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -8, 0)
-    local right = CreateFrame("Frame", nil, f)
-    right:SetPoint("TOPLEFT", f, "TOP", 8, -216)
+    -- top recipes and concentration value
+    local left = W.Card(f, L["Top recipes"])
+    left:SetPoint("TOPLEFT", chartCard, "BOTTOMLEFT", 0, -S.GAP)
+    left:SetPoint("BOTTOMRIGHT", f, "BOTTOM", -S.GAP / 2, 0)
+    local right = W.Card(f, "")
+    right:SetPoint("TOPLEFT", chartCard, "BOTTOM", S.GAP / 2, -S.GAP)
     right:SetPoint("BOTTOMRIGHT", 0, 0)
-    UI.Section(left, L["Top recipes"], 0, 0)
-    page.concentrationTitle = UI.Section(right, "", 0, 0)
+    page.concentrationCard = right
     local function Rows(host, withBar)
         local rows = {}
         for i = 1, TOP do
-            local y = -16 - (i - 1) * 20
-            local r = {}
+            local y = -(i - 1) * (S.ROW_S + 2)
+            local r = CreateFrame("Button", nil, host)
+            r:SetPoint("TOPLEFT", 0, y)
+            r:SetPoint("RIGHT", host, "RIGHT", 0, 0)
+            r:SetHeight(S.ROW_S)
             if withBar then
-                r.bar = host:CreateTexture(nil, "BACKGROUND")
+                r.bar = r:CreateTexture(nil, "BACKGROUND")
                 r.bar:SetColorTexture(unpack(C.accentSoft))
-                r.bar:SetPoint("TOPLEFT", 0, y + 1)
-                r.bar:SetHeight(18)
+                r.bar:SetPoint("TOPLEFT", 0, 0)
+                r.bar:SetHeight(S.ROW_S)
             end
-            r.name = Theme.Text(host, 11, C.text)
-            r.name:SetPoint("TOPLEFT", 4, y - 2)
-            r.name:SetPoint("RIGHT", host, "RIGHT", -70, 0)
+            r.name = Theme.Text(r, "small", C.text)
+            r.name:SetPoint("LEFT", 4, 0)
+            r.name:SetPoint("RIGHT", r, "RIGHT", -76, 0)
             r.name:SetWordWrap(false)
-            r.value = Theme.Text(host, 11, C.text)
-            r.value:SetPoint("TOPRIGHT", host, "TOPRIGHT", -2, y - 2)
+            r.value = Theme.Text(r, "small", C.text)
+            r.value:SetPoint("RIGHT", -2, 0)
             r.value:SetJustifyH("RIGHT")
+            r:SetScript("OnClick", function(self) if self.recipe then UI.OpenRecipe(self.recipe) end end)
             rows[i] = r
         end
         return rows
     end
-    page.top = Rows(left, true)
-    page.conc = Rows(right, false)
-    page.topEmpty = Theme.Text(left, 11, C.textDim)
-    page.topEmpty:SetPoint("TOPLEFT", 4, -18)
+    page.top = Rows(left.body, true)
+    page.conc = Rows(right.body, false)
+    page.topEmpty = Theme.Text(left.body, "small", C.textDim)
+    page.topEmpty:SetPoint("TOPLEFT", 4, -2)
     page.topEmpty:SetText(L["No sold crafts yet."])
-    page.concEmpty = Theme.Text(right, 11, C.textDim)
-    page.concEmpty:SetPoint("TOPLEFT", 4, -18)
+    page.concEmpty = Theme.Text(right.body, "small", C.textDim)
+    page.concEmpty:SetPoint("TOPLEFT", 4, -2)
     page.concEmpty:SetText(L["No concentrated crafts yet"])
-    page.professions = Theme.Text(right, 10, C.textDim)
-    page.professions:SetPoint("TOPLEFT", 4, -16 - TOP * 20 - 6)
-    page.professions:SetPoint("RIGHT", right, "RIGHT", 0, 0)
+    page.professions = Theme.Text(right.body, "caption", C.textDim)
+    page.professions:SetPoint("TOPLEFT", 4, -TOP * (S.ROW_S + 2) - S.XS)
+    page.professions:SetPoint("RIGHT", right.body, "RIGHT", 0, 0)
     page.professions:SetJustifyH("LEFT")
-    page.leftFrame = left
+    page.leftFrame = left.body
 
     function page.Refresh(filter)
         local state = UI.state
@@ -158,6 +157,7 @@ function Summary.Build(parent)
         end
         page.chart:SetData(bars)
         page.chartEmpty:SetShown(not any)
+        page.chart:SetShown(any)
 
         local recipes = {}
         for _, r in ipairs(ns.Stats.Recipes(filter)) do
@@ -168,6 +168,7 @@ function Summary.Build(parent)
         if not width or width <= 0 then width = 200 end
         for i, row in ipairs(page.top) do
             local r = recipes[i]
+            row.recipe = r and r.recipe
             row.name:SetText(r and (r.output and (UI.ItemLabel(r.output)) or r.name) or "")
             row.value:SetText(r and UI.Money(r.profit, { color = true, sign = true }) or "")
             row.bar:SetShown(r ~= nil and r.profit > 0)
@@ -176,10 +177,11 @@ function Summary.Build(parent)
         page.topEmpty:SetShown(#recipes == 0)
 
         local days30 = module and module.db.settings.concentrationDays or 30
-        page.concentrationTitle:SetText(API.Lf("Concentration value (%d days)", days30):upper())
+        page.concentrationCard:SetTitle(API.Lf("Concentration value (%d days)", days30))
         local conc = ns.Concentration.ByRecipe(nil, filter)
         for i, row in ipairs(page.conc) do
             local e = conc[i]
+            row.recipe = e and e.recipe
             row.name:SetText(e and ((e.output and (UI.ItemLabel(e.output))) or e.name) or "")
             row.value:SetText(e and API.Lf("%s/pt", UI.Money(e.value)) or "")
         end
