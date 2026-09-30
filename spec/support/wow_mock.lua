@@ -399,7 +399,8 @@ InstallHookables = function()
         GetProfessionInfoByRecipeID = function(id)
             local r = mock.recipes[id]
             return r and { professionID = r.professionID or 1, professionName = r.profession or "Alchemy",
-                parentProfessionID = r.professionID or 1, parentProfessionName = r.profession or "Alchemy" } or nil
+                parentProfessionID = r.professionID or 1, parentProfessionName = r.profession or "Alchemy",
+                expansionName = r.expansion } or nil
         end,
         GetRecipeSchematic = function(id) local r = mock.recipes[id]; return r and r.schematic end,
         GetRecipeQualityItemIDs = function(id) local r = mock.recipes[id]; return r and r.qualityItemIDs end,

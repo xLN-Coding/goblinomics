@@ -9,6 +9,8 @@
   profession window and works out from the recharge rate when it's full again,
   so you don't have to log in every alt to check. Cooldowns such as transmutes
   show when they're ready, recipes with charges show how many are back.
+  Concentration and cooldowns have their own page each, and both can be
+  filtered by expansion (the current one by default).
 - Notices when a character's concentration is full (or reaches your own
   threshold) or a cooldown is ready: a toast while you play, a chat line after
   login and a line in the minimap tooltip. Each can be switched off, and single

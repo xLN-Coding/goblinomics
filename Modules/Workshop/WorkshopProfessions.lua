@@ -1,11 +1,12 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/WorkshopProfessions.lua
--- "Concentration & cooldowns" view of the Workshop and its dashboard card: every
--- character with a profession, the one due first on top. Under each character its
--- current expansion professions (icon, computed concentration as a bar, "full in")
--- and its recipe cooldowns ("ready in", charges). A click on a character folds it.
--- The profession and character filters apply, the period does not. While shown it
--- refreshes once a minute; values are computed, nothing is asked from the game.
+-- "Concentration & cooldowns" view of the Workshop and its dashboard card. A switch
+-- shows either concentration or cooldowns, a dropdown the expansion (the current one
+-- by default, the same for both and for the notices). Every character with an entry,
+-- the one due first on top; under it the professions (icon, computed concentration
+-- as a bar, "full in") or the recipe cooldowns ("ready in", charges). A click on a
+-- character folds it. The profession and character filters apply, the period does
+-- not. While shown it refreshes once a minute; nothing is asked from the game.
 local _, ns = ...
 
 local View = {}
@@ -13,6 +14,8 @@ ns.WorkshopProfessions = View
 
 local collapsed = {}   -- charKey -> true
 View.collapsed = collapsed
+
+local function Settings() return ns.Workshop.db.settings end
 
 local function ClassColor(class)
     local c = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
@@ -27,30 +30,56 @@ function View.DueText(at, now, readyText, inText)
     return API.Lf(inText, API.Format:Remaining(at - now))
 end
 
---- Flat rows for the list from Professions.Overview, with the Workshop filters.
-function View.Rows(overview, filter)
+--- Flat rows for the list from Professions.Overview: mode "concentration" or
+-- "cooldowns", with the Workshop's profession and character filters.
+function View.Rows(overview, filter, mode)
     filter = filter or {}
     local rows = {}
     for _, e in ipairs(overview) do
         if not filter.char or filter.char == e.key then
-            local professions, cooldowns = {}, e.cooldowns
-            for _, p in ipairs(e.professions) do
-                if not filter.profession or filter.profession == p.name then professions[#professions + 1] = p end
+            local entries, dueAt = {}, nil
+            local source = mode == "cooldowns" and e.cooldowns or e.professions
+            for _, x in ipairs(source) do
+                local profession = mode == "cooldowns" and x.profession or x.name
+                if not filter.profession or not profession or filter.profession == profession then
+                    entries[#entries + 1] = x
+                    local at = mode == "cooldowns" and x.readyAt or x.fullAt
+                    if at and (not dueAt or at < dueAt) then dueAt = at end
+                end
             end
-            if filter.profession then cooldowns = {} end
-            if #professions > 0 or #cooldowns > 0 then
-                rows[#rows + 1] = { kind = "char", entry = e }
+            if #entries > 0 then
+                rows[#rows + 1] = { kind = "char", entry = e, dueAt = dueAt }
                 if not collapsed[e.key] then
-                    for _, p in ipairs(professions) do rows[#rows + 1] = { kind = "profession", entry = e, profession = p } end
-                    for _, cd in ipairs(cooldowns) do rows[#rows + 1] = { kind = "cooldown", entry = e, cooldown = cd } end
+                    local kind = mode == "cooldowns" and "cooldown" or "profession"
+                    for _, x in ipairs(entries) do
+                        rows[#rows + 1] = { kind = kind, entry = e, profession = kind == "profession" and x or nil,
+                            cooldown = kind == "cooldown" and x or nil }
+                    end
                 end
             end
         end
     end
-    return rows
+    -- the character due first on top, for the entries shown
+    local groups = {}
+    for _, r in ipairs(rows) do
+        if r.kind == "char" then groups[#groups + 1] = {} end
+        local group = groups[#groups]
+        group[#group + 1] = r
+    end
+    table.sort(groups, function(a, b)
+        local x, y = a[1].dueAt or math.huge, b[1].dueAt or math.huge
+        if x ~= y then return x < y end
+        return a[1].entry.name < b[1].entry.name
+    end)
+    local out = {}
+    for _, g in ipairs(groups) do for _, r in ipairs(g) do out[#out + 1] = r end end
+    return out
 end
 
-local function Settings() return ns.Workshop.db.settings end
+--- Current mode of the view ("concentration" or "cooldowns").
+function View.Mode()
+    return Settings().professionsMode == "cooldowns" and "cooldowns" or "concentration"
+end
 
 function View.Build(parent)
     local API, L = ns.API, ns.L
@@ -60,11 +89,33 @@ function View.Build(parent)
     local f = page.frame
     f:SetAllPoints(parent)
 
+    local function changed()
+        ns.WorkshopUI.Refresh()
+        API.Emit("WORKSHOP_PROFESSIONS", {})
+    end
+    page.mode = W.Segmented(f, { { value = "concentration", label = L["Concentration"] },
+        { value = "cooldowns", label = L["Cooldowns"] } }, View.Mode, function(value)
+            Settings().professionsMode = value
+            ns.WorkshopUI.Refresh()
+        end, { min = 90 })
+    page.mode:SetPoint("TOPLEFT", 0, 0)
+    page.expansion = W.Dropdown(f, function()
+        local list = { { value = "current", label = L["Current expansion"] } }
+        for _, name in ipairs(ns.Professions.Expansions(ns.Workshop.db.root)) do
+            list[#list + 1] = { value = name, label = name }
+        end
+        list[#list + 1] = { value = "all", label = L["All expansions"] }
+        return list
+    end, function() return Settings().professionsExpansion or "current" end, function(value)
+        Settings().professionsExpansion = value ~= "current" and value or nil
+        changed()
+    end, { size = "L" })
+    page.expansion:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
     local hint = Theme.Text(f, "small", C.textDim)
-    hint:SetPoint("TOPLEFT", 0, -4)
+    hint:SetPoint("TOPLEFT", 0, -(S.CONTROL_H + S.SM))
     hint:SetPoint("RIGHT", f, "RIGHT", 0, 0)
     hint:SetJustifyH("LEFT")
-    hint:SetText(L["Concentration is read when you log in or open a profession window, and computed from then on."])
+    page.hint = hint
 
     local function InitRow(row, data)
         if not row.label then
@@ -110,8 +161,9 @@ function View.Build(parent)
             row.bar:Hide()
             row.label:SetPoint("LEFT", 16, 0)
             row.label:SetText("|c" .. ClassColor(e.class) .. e.name .. "|r")
-            row.status:SetText(e.dueAt and (e.dueAt <= now and (Theme.CODE.good .. L["something is ready"] .. "|r")
-                or API.Lf("next in %s", API.Format:Remaining(e.dueAt - now))) or "")
+            local due = data.dueAt
+            row.status:SetText(due and (due <= now and (Theme.CODE.good .. L["something is ready"] .. "|r")
+                or API.Lf("next in %s", API.Format:Remaining(due - now))) or "")
             return
         end
         row.zebra:Hide()
@@ -146,7 +198,7 @@ function View.Build(parent)
     end
 
     page.list = W.ScrollList(f, { rowHeight = S.ROW, init = InitRow })
-    page.list.box:SetPoint("TOPLEFT", 0, -(S.ROW + S.XS))
+    page.list.box:SetPoint("TOPLEFT", 0, -(S.CONTROL_H + S.SM + S.ROW))
     page.list.box:SetPoint("BOTTOMRIGHT", 0, 0)
     page.empty = W.EmptyState(page.list.box, L["No profession data yet: open a profession window once on each character."])
 
@@ -160,7 +212,11 @@ function View.Build(parent)
 
     function page.Refresh(filter)
         local root = ns.Workshop.db.root
-        local rows = View.Rows(ns.Professions.Overview(root, Settings(), time()), filter)
+        local mode = View.Mode()
+        page.mode:Refresh()
+        page.hint:SetText(mode == "cooldowns" and L["Recipes with a daily cooldown or charges, found when a profession window opens."]
+            or L["Concentration is read when you log in or open a profession window, and computed from then on."])
+        local rows = View.Rows(ns.Professions.Overview(root, Settings(), time()), filter, mode)
         page.rows = rows
         page.list:SetData(rows)
         page.empty:SetShown(#rows == 0)

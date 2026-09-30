@@ -13,13 +13,15 @@ describe("Workshop: concentration and cooldowns", function()
         }
         WoWMock.concentrationIDs = { [2900] = 3100, [2823] = 3050 }
         WoWMock.childSkillLine = 2900
-        WoWMock.recipeIDs = { 700, 701, 702, 703 }
+        WoWMock.recipeIDs = { 700, 701, 702, 703, 704 }
         WoWMock.currencies = { [3100] = { quantity = 400, maxQuantity = 1000, rechargingCycleDurationMS = 360000,
             rechargingAmountPerCycle = 1 } }
-        WoWMock.recipes[700] = { name = "Transmute: Ore" }
-        WoWMock.recipes[701] = { name = "Transmute: Herbs" }
-        WoWMock.recipes[702] = { name = "Potion" }
-        WoWMock.recipes[703] = { name = "Experimental Flask" }
+        WoWMock.recipes[700] = { name = "Transmute: Ore", expansion = "Midnight" }
+        WoWMock.recipes[701] = { name = "Transmute: Herbs", expansion = "Midnight" }
+        WoWMock.recipes[702] = { name = "Potion", expansion = "Midnight" }
+        WoWMock.recipes[703] = { name = "Experimental Flask", expansion = "Midnight" }
+        WoWMock.recipes[704] = { name = "Jard's Peculiar Energy Source", profession = "Engineering",
+            expansion = "Wrath of the Lich King" }
     end
 
     before_each(function()
@@ -43,13 +45,20 @@ describe("Workshop: concentration and cooldowns", function()
         assert.is_nil(P.Current(nil, 0))
     end)
 
-    it("reads only the current expansion's line from the profession window", function()
+    it("keeps every expansion's line from the profession window and shows the chosen one", function()
+        WoWMock.currencies[3050] = { quantity = 1000, maxQuantity = 1000, rechargingCycleDurationMS = 360000 }
         WoWMock.fire("TRADE_SKILL_SHOW")
         WoWMock.advance(1)
         WoWMock.flush()
         local lines = char().professions
         assert.is_table(lines[2900])
-        assert.is_nil(lines[2823])
+        assert.equals("The War Within", lines[2823].expansion)
+        local root = GoblinomicsWorkshopDB
+        assert.equals(1, #P.Overview(root, {}, WoWMock.now)[1].professions)                -- Midnight by default
+        assert.equals(2, #P.Overview(root, { professionsExpansion = "all" }, WoWMock.now)[1].professions)
+        local tww = P.Overview(root, { professionsExpansion = "The War Within" }, WoWMock.now)[1].professions
+        assert.equals(1000, tww[1].current)
+        assert.same({ "Midnight", "The War Within" }, P.Expansions(root))
         assert.equals("Alchemy", lines[2900].name)
         assert.equals(400, lines[2900].amount)
         assert.equals(360, lines[2900].cycleSec)
@@ -70,6 +79,7 @@ describe("Workshop: concentration and cooldowns", function()
         WoWMock.recipeCooldowns[700] = { 3600, true, 0, 0 }
         WoWMock.recipeCooldowns[701] = { 3600, true, 0, 0 }
         WoWMock.recipeCooldowns[703] = { 1800, false, 1, 3 }
+        WoWMock.recipeCooldowns[704] = { 7200, true, 0, 0 }
         WoWMock.spellCharges[703] = { cooldownDuration = 7200 }
         WoWMock.fire("TRADE_SKILL_SHOW")
         WoWMock.advance(1)
@@ -78,8 +88,10 @@ describe("Workshop: concentration and cooldowns", function()
         assert.is_table(list[700])
         assert.is_nil(list[702])
         assert.equals(3, list[703].maxCharges)
+        assert.equals("Wrath of the Lich King", list[704].expansion)
+        assert.equals(3, #P.Overview(GoblinomicsWorkshopDB, { professionsExpansion = "all" }, WoWMock.now)[1].cooldowns)
         local e = P.Overview(GoblinomicsWorkshopDB, {}, WoWMock.now)[1]
-        assert.equals(2, #e.cooldowns)                              -- the two transmutes are one entry
+        assert.equals(2, #e.cooldowns)                              -- the two transmutes are one entry, Jard's is older
         local transmute, flask
         for _, c in ipairs(e.cooldowns) do if c.maxCharges then flask = c else transmute = c end end
         assert.equals(2, transmute.count)
@@ -125,23 +137,27 @@ describe("Workshop: concentration and cooldowns", function()
             cooldowns = { [700] = { name = "Transmute: Ore", readyAt = WoWMock.now - 5 } } }
         char().professions = { [2900] = { name = "Alchemy", amount = 100, max = 1000, cycleSec = 360, readAt = WoWMock.now } }
         local V = wns.WorkshopProfessions
+        root.chars["Alt-Realm"].cooldowns[700].expansion = "Midnight"
         local overview = P.Overview(root, {}, WoWMock.now)
-        local rows = V.Rows(overview, {})
-        assert.same({ "char", "profession", "cooldown", "char", "profession" },
-            { rows[1].kind, rows[2].kind, rows[3].kind, rows[4].kind, rows[5].kind })
-        assert.equals("Alt-Realm", rows[1].entry.key)                 -- the transmute is ready
-        assert.equals(3, #V.Rows(overview, { char = "Alt-Realm" }))
-        assert.equals(2, #V.Rows(overview, { profession = "Blacksmithing" }))   -- no cooldowns under a profession filter
-        assert.equals(2, #V.Rows(overview, { profession = "Alchemy" }))
+        local rows = V.Rows(overview, {}, "concentration")
+        assert.same({ "char", "profession", "char", "profession" }, { rows[1].kind, rows[2].kind, rows[3].kind, rows[4].kind })
+        assert.equals("Alt-Realm", rows[1].entry.key)                 -- full first
+        rows = V.Rows(overview, {}, "cooldowns")
+        assert.same({ "char", "cooldown" }, { rows[1].kind, rows[2].kind })
+        assert.equals(2, #V.Rows(overview, { char = "Alt-Realm" }, "concentration"))
+        assert.equals(2, #V.Rows(overview, { profession = "Alchemy" }, "concentration"))
         V.collapsed["Alt-Realm"] = true
-        assert.equals(3, #V.Rows(overview, {}))
+        assert.equals(3, #V.Rows(overview, {}, "concentration"))
         V.collapsed["Alt-Realm"] = nil
 
         local tab = ns.UI.GetTab("workshop")
         tab.build(CreateFrame("Frame"))
         tab.onShow()
         wns.WorkshopUI.Show("professions")
-        assert.equals(5, #wns.WorkshopUI.CurrentPage().rows)
+        assert.equals(4, #wns.WorkshopUI.CurrentPage().rows)
+        root.settings.professionsMode = "cooldowns"
+        wns.WorkshopUI.Refresh()
+        assert.equals(2, #wns.WorkshopUI.CurrentPage().rows)
         WoWMock.advance(61)
         WoWMock.flush()
         tab.onHide()

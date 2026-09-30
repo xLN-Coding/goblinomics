@@ -672,3 +672,7 @@ L["Everything that is full or ready, once after login."] = "Alles, was voll oder
 L["Line in the minimap tooltip"] = "Zeile im Minimap-Tooltip"
 L["How many are ready and when the next one is."] = "Wie viele bereit sind und wann das Nächste so weit ist."
 L["Switched off characters are left out of concentration and cooldowns."] = "Abgeschaltete Charaktere fehlen bei Konzentration und Cooldowns."
+L["Cooldowns"] = "Cooldowns"
+L["Current expansion"] = "Aktuelle Erweiterung"
+L["All expansions"] = "Alle Erweiterungen"
+L["Recipes with a daily cooldown or charges, found when a profession window opens."] = "Rezepte mit täglichem Cooldown oder Aufladungen, erkannt beim Öffnen eines Berufsfensters."

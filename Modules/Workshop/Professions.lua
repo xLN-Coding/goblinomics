@@ -4,7 +4,8 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 --   concentration  read once (profession window, CURRENCY_DISPLAY_UPDATE, login) as
 --                  { amount, max, cycleSec, perCycle, readAt }; the current value and
 --                  the time it reaches the threshold follow from the recharge rate.
---                  Only the current expansion's (Midnight) profession lines count.
+--                  Every expansion line with concentration is kept with its
+--                  expansion; views and notices show the chosen one (Midnight by default).
 --                  The currency of a profession line is only known once its window
 --                  was open; after that the login reads it without a window.
 --   cooldowns      recipes with a daily cooldown or charges, found when the
@@ -32,12 +33,50 @@ local function CurrentExpansionName()
     return level and _G["EXPANSION_NAME" .. level] or nil
 end
 
---- Is a child profession line (ProfessionInfo) one of the current expansion?
-function Professions.IsCurrent(info)
-    if type(info) ~= "table" then return false end
-    local name = CurrentExpansionName()
-    if name and info.expansionName then return info.expansionName == name end
-    return false
+--- Expansion of a stored cooldown; filled in from the recipe when an older entry lacks it.
+local function CooldownExpansion(recipeID, cd)
+    if not cd.expansion and C_TradeSkillUI and C_TradeSkillUI.GetProfessionInfoByRecipeID then
+        local prof = C_TradeSkillUI.GetProfessionInfoByRecipeID(recipeID)
+        if prof and prof.expansionName then cd.expansion = prof.expansionName end
+    end
+    return cd.expansion
+end
+
+--- Order of an expansion name (newest highest); unknown names last.
+local function ExpansionLevel(name)
+    for level = 30, 0, -1 do
+        if _G["EXPANSION_NAME" .. level] == name then return level end
+    end
+    return -1
+end
+
+--- The expansion filter for concentration and cooldowns: nil / "current" means the
+-- current expansion, "all" everything, otherwise an expansion name.
+function Professions.ExpansionFilter(settings)
+    local value = settings and settings.professionsExpansion
+    if value == nil or value == "current" then return CurrentExpansionName() or "all" end
+    return value
+end
+
+--- Expansions that stored concentration and cooldowns belong to, newest first.
+function Professions.Expansions(root)
+    local seen, list = {}, {}
+    local function Add(name)
+        if name and not seen[name] then
+            seen[name] = true
+            list[#list + 1] = name
+        end
+    end
+    for _, c in pairs(root.chars or {}) do
+        if type(c) == "table" then
+            for recipeID, cd in pairs(c.cooldowns or {}) do Add(CooldownExpansion(recipeID, cd)) end
+            for _, p in pairs(c.professions or {}) do Add(p.expansion) end
+        end
+    end
+    local current = CurrentExpansionName()
+    if current and not seen[current] then list[#list + 1] = current end
+    table.sort(list, function(a, b) return ExpansionLevel(a) > ExpansionLevel(b) end)
+    return list
 end
 
 -- Pure computation --------------------------------------------------------------------
@@ -108,11 +147,12 @@ function Professions.ReadWindow()
     local changed = false
     for _, info in ipairs(ts.GetChildProfessionInfos() or {}) do
         local id = info.professionID
-        if id and Professions.IsCurrent(info) then
+        if id then
             local currencyID = ts.GetConcentrationCurrencyID(id)
             if currencyID and currencyID ~= 0 then
                 local p = c.professions[id] or {}
                 p.name = info.parentProfessionName or info.professionName
+                p.expansion = info.expansionName or p.expansion
                 p.currencyID = currencyID
                 p.icon = ts.GetTradeSkillTexture and ts.GetTradeSkillTexture(info.parentProfessionID or id) or p.icon
                 c.professions[id] = p
@@ -166,6 +206,11 @@ function Professions.ReadCooldown(recipeID)
     local info = ts.GetRecipeInfo and ts.GetRecipeInfo(recipeID)
     entry.name = info and info.name or entry.name
     entry.icon = info and info.icon or entry.icon
+    local prof = ts.GetProfessionInfoByRecipeID and ts.GetProfessionInfoByRecipeID(recipeID)
+    if prof then
+        entry.expansion = prof.expansionName or entry.expansion
+        entry.profession = prof.parentProfessionName or prof.professionName or entry.profession
+    end
     entry.isDay = isDay and true or nil
     entry.maxCharges = maxCharges > 1 and maxCharges or nil
     entry.charges = maxCharges > 1 and charges or nil
@@ -221,26 +266,33 @@ function Professions.Overview(root, settings, now)
         if type(c) == "table" and not hidden[charKey] and (next(c.professions or {}) or next(c.cooldowns or {})) then
             local e = { key = charKey, name = c.name or charKey:match("^([^%-]+)") or charKey, class = c.class,
                 professions = {}, cooldowns = {} }
+            local expansion = Professions.ExpansionFilter(settings)
             for id, p in pairs(c.professions or {}) do
-                e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon,
+              -- lines stored before the expansion was kept belong to the current expansion
+              if expansion == "all" or (p.expansion or CurrentExpansionName()) == expansion then
+                e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon, expansion = p.expansion,
                     current = Professions.Current(p, now), max = p.max or 1000, readAt = p.readAt,
                     fullAt = Professions.FullAt(p, threshold) }
+              end
             end
             table.sort(e.professions, function(a, b) return (a.name or "") < (b.name or "") end)
             local groups = {}
             for recipeID, cd in pairs(c.cooldowns or {}) do
+              if expansion == "all" or CooldownExpansion(recipeID, cd) == expansion then
                 local charges, readyAt, fullAt = Professions.CooldownState(cd, now)
-                local group = not cd.maxCharges and readyAt and math.floor(readyAt / 5) or nil
+                local group = not cd.maxCharges and readyAt and ((cd.expansion or "") .. ":" .. math.floor(readyAt / 5)) or nil
                 local merged = group and groups[group]
                 if merged then
                     merged.count = merged.count + 1
                     if (cd.name or "") < (merged.name or "") then merged.name, merged.icon = cd.name, cd.icon end
                 else
                     local entry = { recipeID = recipeID, name = cd.name, icon = cd.icon, charges = charges,
-                        maxCharges = cd.maxCharges, readyAt = readyAt, fullAt = fullAt, count = 1 }
+                        maxCharges = cd.maxCharges, readyAt = readyAt, fullAt = fullAt, count = 1,
+                        expansion = cd.expansion, profession = cd.profession }
                     e.cooldowns[#e.cooldowns + 1] = entry
                     if group then groups[group] = entry end
                 end
+              end
             end
             table.sort(e.cooldowns, function(a, b)
                 if (a.readyAt or 0) ~= (b.readyAt or 0) then return (a.readyAt or 0) < (b.readyAt or 0) end
