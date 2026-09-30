@@ -541,6 +541,9 @@ _G.C_AddOns = {
     end,
 }
 
+_G.EXPANSION_NAME0 = "Classic"
+_G.EXPANSION_NAME1 = "The Burning Crusade"
+_G.EXPANSION_NAME2 = "Wrath of the Lich King"
 _G.EXPANSION_NAME10 = "The War Within"
 _G.EXPANSION_NAME11 = "Midnight"
 _G.Enum = {

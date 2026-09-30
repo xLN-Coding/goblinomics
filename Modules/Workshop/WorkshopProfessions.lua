@@ -30,6 +30,16 @@ function View.DueText(at, now, readyText, inText)
     return API.Lf(inText, API.Format:Remaining(at - now))
 end
 
+--- "  - Midnight" style tag (a middle dot, or "Engineering, Wrath of the Lich King") in grey after a row's name.
+function View.ExpansionTag(expansion, profession)
+    local Theme = ns.API.Theme
+    local parts = {}
+    if profession then parts[#parts + 1] = profession end
+    if expansion then parts[#parts + 1] = expansion end
+    if #parts == 0 then return "" end
+    return "  " .. Theme.Colorize("\194\183 " .. table.concat(parts, ", "), Theme.colors.textDim)
+end
+
 --- Flat rows for the list from Professions.Overview: mode "concentration" or
 -- "cooldowns", with the Workshop's profession and character filters.
 function View.Rows(overview, filter, mode)
@@ -173,7 +183,7 @@ function View.Build(parent)
             local p = data.profession
             row.icon:SetTexture(p.icon or 134400)
             row.icon:Show()
-            row.label:SetText(p.name or "?")
+            row.label:SetText((p.name or "?") .. View.ExpansionTag(p.expansion))
             row.bar:Show()
             row.bar:SetMinMaxValues(0, p.max or 1000)
             row.bar:SetValue(p.current or 0)
@@ -184,7 +194,7 @@ function View.Build(parent)
             row.icon:SetTexture(cd.icon or 134400)
             row.icon:Show()
             row.label:SetText((cd.name or "?") .. (cd.count > 1 and (" " .. Theme.Colorize("(+" .. (cd.count - 1) .. ")",
-                C.textDim)) or ""))
+                C.textDim)) or "") .. View.ExpansionTag(cd.expansion, cd.profession))
             if cd.maxCharges then
                 row.bar:Show()
                 row.bar:SetMinMaxValues(0, cd.maxCharges)

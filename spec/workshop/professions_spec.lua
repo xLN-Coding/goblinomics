@@ -58,7 +58,11 @@ describe("Workshop: concentration and cooldowns", function()
         assert.equals(2, #P.Overview(root, { professionsExpansion = "all" }, WoWMock.now)[1].professions)
         local tww = P.Overview(root, { professionsExpansion = "The War Within" }, WoWMock.now)[1].professions
         assert.equals(1000, tww[1].current)
-        assert.same({ "Midnight", "The War Within" }, P.Expansions(root))
+        assert.same({ "Midnight", "The War Within", "Wrath of the Lich King", "The Burning Crusade", "Classic" },
+            P.Expansions(root))                                     -- every expansion, newest first
+        assert.is_truthy(wns.WorkshopProfessions.ExpansionTag("Midnight"):find("Midnight"))
+        assert.is_truthy(wns.WorkshopProfessions.ExpansionTag("Classic", "Engineering"):find("Engineering, Classic"))
+        assert.equals("", wns.WorkshopProfessions.ExpansionTag(nil))
         assert.equals("Alchemy", lines[2900].name)
         assert.equals(400, lines[2900].amount)
         assert.equals(360, lines[2900].cycleSec)

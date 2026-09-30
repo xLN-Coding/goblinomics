@@ -58,25 +58,30 @@ function Professions.ExpansionFilter(settings)
     return value
 end
 
---- Expansions that stored concentration and cooldowns belong to, newest first.
+--- Every expansion the client knows (Classic up to the current one), newest first,
+-- plus names from stored entries the client does not list.
 function Professions.Expansions(root)
     local seen, list = {}, {}
     local function Add(name)
-        if name and not seen[name] then
+        if name and name ~= "" and not seen[name] then
             seen[name] = true
             list[#list + 1] = name
         end
     end
-    for _, c in pairs(root.chars or {}) do
+    for level = 0, 30 do Add(_G["EXPANSION_NAME" .. level]) end
+    for _, c in pairs(root and root.chars or {}) do
         if type(c) == "table" then
             for recipeID, cd in pairs(c.cooldowns or {}) do Add(CooldownExpansion(recipeID, cd)) end
             for _, p in pairs(c.professions or {}) do Add(p.expansion) end
         end
     end
-    local current = CurrentExpansionName()
-    if current and not seen[current] then list[#list + 1] = current end
     table.sort(list, function(a, b) return ExpansionLevel(a) > ExpansionLevel(b) end)
     return list
+end
+
+--- Expansion of a profession line; lines stored before it was kept belong to the current one.
+function Professions.LineExpansion(p)
+    return p.expansion or CurrentExpansionName()
 end
 
 -- Pure computation --------------------------------------------------------------------
@@ -269,8 +274,9 @@ function Professions.Overview(root, settings, now)
             local expansion = Professions.ExpansionFilter(settings)
             for id, p in pairs(c.professions or {}) do
               -- lines stored before the expansion was kept belong to the current expansion
-              if expansion == "all" or (p.expansion or CurrentExpansionName()) == expansion then
-                e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon, expansion = p.expansion,
+              if expansion == "all" or Professions.LineExpansion(p) == expansion then
+                e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon,
+                    expansion = Professions.LineExpansion(p),
                     current = Professions.Current(p, now), max = p.max or 1000, readAt = p.readAt,
                     fullAt = Professions.FullAt(p, threshold) }
               end
