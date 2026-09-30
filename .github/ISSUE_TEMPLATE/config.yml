@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: FAQ
-    url: https://github.com/xLN-Coding/goblinomics/wiki/FAQ
+    url: https://github.com/xLN1995/goblinomics/wiki/FAQ
     about: Why is my wealth different from TSM? Why isn't an item counted? Answers to the usual questions.
   - name: Wiki
-    url: https://github.com/xLN-Coding/goblinomics/wiki
+    url: https://github.com/xLN1995/goblinomics/wiki
     about: How each module works, settings and commands.

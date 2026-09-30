@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time. The more of this you can fill in, the faster I can fix it.
-        If you're not sure it's a bug, the [FAQ](https://github.com/xLN-Coding/goblinomics/wiki/FAQ) might already have the answer.
+        If you're not sure it's a bug, the [FAQ](https://github.com/xLN1995/goblinomics/wiki/FAQ) might already have the answer.
   - type: textarea
     id: what
     attributes:

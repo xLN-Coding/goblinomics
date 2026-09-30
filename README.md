@@ -51,12 +51,12 @@ What's inside:
 
 Don't need one of them? Switch it off in the settings and it disappears.
 
-The [wiki](https://github.com/xLN-Coding/goblinomics/wiki) explains each module,
+The [wiki](https://github.com/xLN1995/goblinomics/wiki) explains each module,
 the settings and the slash commands in more detail.
 
 ## Found a bug?
 
-Open an [issue](https://github.com/xLN-Coding/goblinomics/issues). The most useful
+Open an [issue](https://github.com/xLN1995/goblinomics/issues). The most useful
 things to include are the Lua error (BugSack makes that easy) and the output of
 `/gob status`. If the game stutters, `/gob perf` helps me find out why.
 
