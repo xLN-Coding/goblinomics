@@ -17,3 +17,5 @@ Learn.lua
 Activities.lua
 Share.lua
 Presets.lua
+TextDialog.lua
+RoutinesUI.lua
