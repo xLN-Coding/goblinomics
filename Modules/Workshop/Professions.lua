@@ -1,0 +1,358 @@
+if GOBLINOMICS_CLIENT_BLOCKED then return end
+-- Modules/Workshop/Professions.lua
+-- Concentration and recipe cooldowns of every character, computed instead of polled.
+--   concentration  read once (profession window, CURRENCY_DISPLAY_UPDATE, login) as
+--                  { amount, max, cycleSec, perCycle, readAt }; the current value and
+--                  the time it reaches the threshold follow from the recharge rate.
+--                  Only the current expansion's (Midnight) profession lines count.
+--                  The currency of a profession line is only known once its window
+--                  was open; after that the login reads it without a window.
+--   cooldowns      recipes with a daily cooldown or charges, found when the
+--                  profession window opens and after a craft; stored with the time
+--                  they are ready (readyAt) and, for charges, when they are full.
+-- Stored per character in the Workshop's character table (professions, cooldowns).
+-- Idle cost: the events below and nothing else; notices plan their own timer.
+local _, ns = ...
+
+local Professions = {}
+ns.Professions = Professions
+
+local API = ns.API
+local module
+local scanning = false
+
+local function IsSecret(v) return issecretvalue ~= nil and issecretvalue(v) == true end
+
+local function Now() return GetServerTime and GetServerTime() or time() end
+
+-- Current expansion ------------------------------------------------------------------
+--- Localized name of the expansion whose concentration counts (Midnight), or nil.
+local function CurrentExpansionName()
+    local level = Enum and Enum.ExpansionLevel and Enum.ExpansionLevel.Midnight
+    return level and _G["EXPANSION_NAME" .. level] or nil
+end
+
+--- Is a child profession line (ProfessionInfo) one of the current expansion?
+function Professions.IsCurrent(info)
+    if type(info) ~= "table" then return false end
+    local name = CurrentExpansionName()
+    if name and info.expansionName then return info.expansionName == name end
+    return false
+end
+
+-- Pure computation --------------------------------------------------------------------
+--- Concentration at time now from a stored reading.
+function Professions.Current(p, now)
+    if not p or not p.amount then return nil end
+    local max = p.max or 1000
+    if not p.cycleSec or p.cycleSec <= 0 then return math.min(max, p.amount) end
+    local cycles = math.floor(math.max(0, (now or Now()) - (p.readAt or 0)) / p.cycleSec)
+    return math.min(max, p.amount + cycles * (p.perCycle or 1))
+end
+
+--- Time the stored reading reaches threshold (default: max); readAt when it already has.
+function Professions.FullAt(p, threshold)
+    if not p or not p.amount then return nil end
+    local target = math.min(threshold or p.max or 1000, p.max or 1000)
+    if p.amount >= target then return p.readAt end
+    if not p.cycleSec or p.cycleSec <= 0 then return nil end
+    return p.readAt + math.ceil((target - p.amount) / (p.perCycle or 1)) * p.cycleSec
+end
+
+--- Charges of a stored cooldown at time now, the time the next charge (or the
+-- daily cooldown) is ready and the time all charges are back.
+function Professions.CooldownState(cd, now)
+    now = now or Now()
+    if not cd.maxCharges or cd.maxCharges <= 1 then
+        return (cd.readyAt or 0) <= now and 1 or 0, cd.readyAt, cd.readyAt
+    end
+    local max, charges, nextAt, per = cd.maxCharges, cd.charges or 0, cd.readyAt, cd.perCharge or 0
+    if charges >= max or not nextAt then return max, nil, nil end
+    local fullAt = nextAt + (max - charges - 1) * per
+    if now >= nextAt then
+        local gained = per > 0 and (1 + math.floor((now - nextAt) / per)) or (max - charges)
+        charges = math.min(max, charges + gained)
+        nextAt = charges < max and (nextAt + gained * per) or nil
+    end
+    return charges, nextAt, fullAt
+end
+
+-- Reading -----------------------------------------------------------------------------
+local function Char() return module and module.db.char end
+
+--- Read the currency of one stored profession line; true when it changed.
+local function ReadCurrency(p)
+    if not (p.currencyID and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo) then return false end
+    local info = C_CurrencyInfo.GetCurrencyInfo(p.currencyID)
+    if not info or IsSecret(info.quantity) or type(info.quantity) ~= "number" then return false end
+    p.amount = info.quantity
+    p.max = (info.maxQuantity and info.maxQuantity > 0) and info.maxQuantity or 1000
+    local ms = info.rechargingCycleDurationMS
+    p.cycleSec = (type(ms) == "number" and ms > 0) and ms / 1000 or p.cycleSec
+    local per = info.rechargingAmountPerCycle
+    p.perCycle = (type(per) == "number" and per > 0) and per or (p.perCycle or 1)
+    p.readAt = Now()
+    return true
+end
+
+local function Changed()
+    API.Emit("WORKSHOP_PROFESSIONS", {})
+end
+
+--- Profession lines of the current expansion from the open profession window.
+function Professions.ReadWindow()
+    local c = Char()
+    local ts = C_TradeSkillUI
+    if not c or not ts or not ts.GetChildProfessionInfos or not ts.GetConcentrationCurrencyID then return end
+    c.professions = c.professions or {}
+    local changed = false
+    for _, info in ipairs(ts.GetChildProfessionInfos() or {}) do
+        local id = info.professionID
+        if id and Professions.IsCurrent(info) then
+            local currencyID = ts.GetConcentrationCurrencyID(id)
+            if currencyID and currencyID ~= 0 then
+                local p = c.professions[id] or {}
+                p.name = info.parentProfessionName or info.professionName
+                p.currencyID = currencyID
+                p.icon = ts.GetTradeSkillTexture and ts.GetTradeSkillTexture(info.parentProfessionID or id) or p.icon
+                c.professions[id] = p
+                if ReadCurrency(p) then changed = true end
+            end
+        end
+    end
+    if changed then Changed() end
+end
+
+--- Every stored currency of this character, without a window (login).
+function Professions.ReadStored()
+    local c = Char()
+    if not c or type(c.professions) ~= "table" then return end
+    local changed = false
+    for _, p in pairs(c.professions) do
+        if ReadCurrency(p) then changed = true end
+    end
+    if changed then Changed() end
+end
+
+local function OnCurrency(_, currencyID)
+    local c = Char()
+    if not c or type(c.professions) ~= "table" then return end
+    for _, p in pairs(c.professions) do
+        if p.currencyID == currencyID and ReadCurrency(p) then Changed() return end
+    end
+end
+
+-- Cooldowns ---------------------------------------------------------------------------
+local function CooldownsSecret()
+    return C_Secrets and C_Secrets.ShouldCooldownsBeSecret and C_Secrets.ShouldCooldownsBeSecret() == true
+end
+
+--- Read one recipe's cooldown into the character's list; true when it has one.
+function Professions.ReadCooldown(recipeID)
+    local c = Char()
+    local ts = C_TradeSkillUI
+    if not c or not ts or not ts.GetRecipeCooldown or CooldownsSecret() then return false end
+    local cd, isDay, charges, maxCharges = ts.GetRecipeCooldown(recipeID)
+    if IsSecret(cd) or IsSecret(charges) then return false end
+    cd, charges, maxCharges = cd or 0, charges or 0, maxCharges or 0
+    local entry = c.cooldowns and c.cooldowns[recipeID]
+    if not (isDay or maxCharges > 0 or cd > 0) then
+        -- ready again: keep known cooldown recipes, their time has passed
+        if entry then entry.readyAt, entry.charges = Now(), entry.maxCharges end
+        return entry ~= nil
+    end
+    c.cooldowns = c.cooldowns or {}
+    entry = entry or {}
+    local info = ts.GetRecipeInfo and ts.GetRecipeInfo(recipeID)
+    entry.name = info and info.name or entry.name
+    entry.icon = info and info.icon or entry.icon
+    entry.isDay = isDay and true or nil
+    entry.maxCharges = maxCharges > 1 and maxCharges or nil
+    entry.charges = maxCharges > 1 and charges or nil
+    if maxCharges > 1 and C_Spell and C_Spell.GetSpellCharges then
+        local sc = C_Spell.GetSpellCharges(recipeID)
+        if sc and type(sc.cooldownDuration) == "number" and not IsSecret(sc.cooldownDuration) then
+            entry.perCharge = sc.cooldownDuration
+        end
+    end
+    entry.readyAt = Now() + cd
+    c.cooldowns[recipeID] = entry
+    return true
+end
+
+--- Refresh the known cooldown recipes of this character (login, after crafts).
+function Professions.ReadStoredCooldowns()
+    local c = Char()
+    if not c or type(c.cooldowns) ~= "table" then return end
+    for recipeID in pairs(c.cooldowns) do Professions.ReadCooldown(recipeID) end
+    Changed()
+end
+
+--- Look through the learned recipes of the open profession for cooldowns (a job).
+function Professions.ScanRecipes()
+    local ts = C_TradeSkillUI
+    if scanning or not module or not ts or not ts.GetAllRecipeIDs then return end
+    scanning = true
+    module:RunJob("cooldownScan", function()
+        local found = false
+        for i, recipeID in ipairs(ts.GetAllRecipeIDs() or {}) do
+            local info = ts.GetRecipeInfo and ts.GetRecipeInfo(recipeID)
+            if info and info.learned ~= false and Professions.ReadCooldown(recipeID) then found = true end
+            if i % 50 == 0 then API.Yield() end
+        end
+        scanning = false
+        if found then Changed() end
+    end)
+end
+
+-- Overview over all characters ------------------------------------------------------------
+--- Characters with at least one profession line or cooldown, sorted by the time
+-- their first entry is due. { { key, name, class, professions = { { id, name, icon,
+-- current, max, fullAt, readAt } }, cooldowns = { { recipeID, name, icon, charges,
+-- maxCharges, readyAt, fullAt, count } }, dueAt } }. Shared cooldowns (same ready
+-- time, e.g. transmutes) are merged into one entry with count > 1.
+function Professions.Overview(root, settings, now)
+    now = now or Now()
+    settings = settings or {}
+    local threshold = settings.concentrationThreshold or 1000
+    local hidden = settings.professionsHidden or {}
+    local list = {}
+    for charKey, c in pairs(root.chars or {}) do
+        if type(c) == "table" and not hidden[charKey] and (next(c.professions or {}) or next(c.cooldowns or {})) then
+            local e = { key = charKey, name = c.name or charKey:match("^([^%-]+)") or charKey, class = c.class,
+                professions = {}, cooldowns = {} }
+            for id, p in pairs(c.professions or {}) do
+                e.professions[#e.professions + 1] = { id = id, name = p.name, icon = p.icon,
+                    current = Professions.Current(p, now), max = p.max or 1000, readAt = p.readAt,
+                    fullAt = Professions.FullAt(p, threshold) }
+            end
+            table.sort(e.professions, function(a, b) return (a.name or "") < (b.name or "") end)
+            local groups = {}
+            for recipeID, cd in pairs(c.cooldowns or {}) do
+                local charges, readyAt, fullAt = Professions.CooldownState(cd, now)
+                local group = not cd.maxCharges and readyAt and math.floor(readyAt / 5) or nil
+                local merged = group and groups[group]
+                if merged then
+                    merged.count = merged.count + 1
+                    if (cd.name or "") < (merged.name or "") then merged.name, merged.icon = cd.name, cd.icon end
+                else
+                    local entry = { recipeID = recipeID, name = cd.name, icon = cd.icon, charges = charges,
+                        maxCharges = cd.maxCharges, readyAt = readyAt, fullAt = fullAt, count = 1 }
+                    e.cooldowns[#e.cooldowns + 1] = entry
+                    if group then groups[group] = entry end
+                end
+            end
+            table.sort(e.cooldowns, function(a, b)
+                if (a.readyAt or 0) ~= (b.readyAt or 0) then return (a.readyAt or 0) < (b.readyAt or 0) end
+                return (a.name or "") < (b.name or "")
+            end)
+            for _, p in ipairs(e.professions) do
+                if p.fullAt and (not e.dueAt or p.fullAt < e.dueAt) then e.dueAt = p.fullAt end
+            end
+            for _, cd in ipairs(e.cooldowns) do
+                if cd.readyAt and (not e.dueAt or cd.readyAt < e.dueAt) then e.dueAt = cd.readyAt end
+            end
+            list[#list + 1] = e
+        end
+    end
+    table.sort(list, function(a, b)
+        if (a.dueAt or math.huge) ~= (b.dueAt or math.huge) then return (a.dueAt or math.huge) < (b.dueAt or math.huge) end
+        return a.name < b.name
+    end)
+    return list
+end
+
+--- Due entries over all characters, earliest first: { { char, name, class, kind =
+-- "concentration"|"cooldown", label, icon, at } } (at <= now: already full / ready).
+function Professions.Due(root, settings, now)
+    local out = {}
+    for _, e in ipairs(Professions.Overview(root, settings, now)) do
+        for _, p in ipairs(e.professions) do
+            if p.fullAt then
+                out[#out + 1] = { char = e.key, name = e.name, class = e.class, kind = "concentration",
+                    label = p.name, icon = p.icon, at = p.fullAt, id = "c:" .. e.key .. ":" .. p.id }
+            end
+        end
+        for _, cd in ipairs(e.cooldowns) do
+            if cd.readyAt then
+                out[#out + 1] = { char = e.key, name = e.name, class = e.class, kind = "cooldown",
+                    label = cd.name, icon = cd.icon, at = cd.readyAt, count = cd.count,
+                    id = "r:" .. e.key .. ":" .. cd.recipeID }
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        if a.at ~= b.at then return a.at < b.at end
+        return a.id < b.id
+    end)
+    return out
+end
+
+-- Events ------------------------------------------------------------------------------------
+-- The window fires TRADE_SKILL_LIST_UPDATE often: read once per opening and line.
+local pendingRead, scannedLines = false, {}
+local function OnTradeSkill()
+    if pendingRead then return end
+    pendingRead = true
+    module:After(0.5, function()
+        pendingRead = false
+        Professions.ReadWindow()
+        local line = C_TradeSkillUI and C_TradeSkillUI.GetProfessionChildSkillLineID
+            and C_TradeSkillUI.GetProfessionChildSkillLineID() or 0
+        if not scannedLines[line] then
+            scannedLines[line] = true
+            Professions.ScanRecipes()
+        end
+    end)
+end
+
+local function OnTradeSkillClose()
+    for k in pairs(scannedLines) do scannedLines[k] = nil end
+end
+
+-- After a craft (the tracker's record) the recipe may have a new cooldown.
+local function OnCrafted(record)
+    local recipeID = type(record) == "table" and record.recipe
+    if recipeID then
+        module:After(1, function()
+            if Professions.ReadCooldown(recipeID) then Changed() end
+        end)
+    end
+end
+
+--- Chat lines for /gob professions: what was found for this character.
+local function Command()
+    local c = Char()
+    local out = {}
+    for id, p in pairs(c and c.professions or {}) do
+        out[#out + 1] = ("%s: line %d, currency %s, %s/%s, %ss per %s"):format(p.name or "?", id, tostring(p.currencyID),
+            tostring(p.amount), tostring(p.max), tostring(p.cycleSec), tostring(p.perCycle))
+    end
+    for id, cd in pairs(c and c.cooldowns or {}) do
+        out[#out + 1] = ("%s (%d): ready in %ds"):format(cd.name or "?", id, math.max(0, (cd.readyAt or 0) - Now()))
+    end
+    if #out == 0 then out[1] = API.L["No profession data yet: open a profession window once."] end
+    for _, line in ipairs(out) do ns.Print(line) end
+end
+
+function Professions.Enable(m)
+    module = m
+    local c = m.db.char
+    c.name = UnitName and UnitName("player") or c.name
+    c.class = UnitClass and select(2, UnitClass("player")) or c.class
+    m:RegisterEvent("TRADE_SKILL_SHOW", OnTradeSkill)
+    m:RegisterEvent("TRADE_SKILL_LIST_UPDATE", OnTradeSkill)
+    m:RegisterEvent("TRADE_SKILL_CLOSE", OnTradeSkillClose)
+    m:RegisterEvent("CURRENCY_DISPLAY_UPDATE", OnCurrency)
+    API.On("WORKSHOP_CRAFT", OnCrafted, "Goblinomics_Workshop.Professions")
+    m:After(3, function()
+        Professions.ReadStored()
+        Professions.ReadStoredCooldowns()
+    end)
+    API.RegisterCommand("professions", Command, API.L["concentration and cooldowns found for this character"])
+end
+
+function Professions.Disable()
+    scanning, pendingRead = false, false
+    OnTradeSkillClose()
+end

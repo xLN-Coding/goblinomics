@@ -24,6 +24,9 @@ local Workshop = API.RegisterModule(ADDON_NAME, {
             retentionDays = 90,       -- raw craft records, then aggregates per recipe
             lotDays = 90,             -- unsold crafted items leave the open stock after this
             concentrationDays = 30,   -- window of the average concentration value
+            concentrationThreshold = 1000,   -- notices when concentration reaches this
+            notifyToast = true, notifyChat = true, notifyTooltip = true,
+            professionsHidden = {},   -- charKey -> true: left out of concentration and cooldowns
         },
         charDefaults = {},
     },
@@ -31,7 +34,7 @@ local Workshop = API.RegisterModule(ADDON_NAME, {
 ns.Workshop = Workshop
 
 local PARTS = { "Recipes", "Reagents", "Purchases", "CraftTracker", "Lots", "Orders", "Concentration", "Salvage",
-    "Stats", "Retention", "Recompute",
+    "Stats", "Retention", "Recompute", "Professions",
     "WorkshopSummary", "WorkshopUI" }
 
 function Workshop:OnInit()

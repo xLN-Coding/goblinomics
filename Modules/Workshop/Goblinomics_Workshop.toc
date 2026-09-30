@@ -18,6 +18,7 @@ CraftTracker.lua
 Lots.lua
 Orders.lua
 Concentration.lua
+Professions.lua
 Salvage.lua
 Stats.lua
 Retention.lua

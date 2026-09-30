@@ -84,6 +84,16 @@ function mock.reset()
     mock.auctions = {}      -- auctions[i] = { itemLink, itemID, quantity, status }
     mock.equipment = {}     -- equipment[slot] = link
     mock.itemRequests = {}
+    -- professions: child lines of the open window, their concentration currency,
+    -- currencies by id, recipe cooldowns { cd, isDay, charges, maxCharges }, spell charges
+    mock.childProfessions = {}
+    mock.concentrationIDs = {}
+    mock.childSkillLine = 0
+    mock.recipeIDs = {}
+    mock.currencies = {}
+    mock.recipeCooldowns = {}
+    mock.spellCharges = {}
+    mock.cooldownsSecret = false
     mock.profileStep = 0.01
     mock.player = { name = "xLN", realm = "Blackrock", guid = "Player-1-0000ABCD", class = "WARRIOR", faction = "Horde",
         level = 80 }
@@ -399,7 +409,19 @@ InstallHookables = function()
             return link and { hyperlink = link } or nil
         end,
         GetOriginalCraftRecipeID = function(guid) return mock.recraftRecipes[guid] end,
+        GetChildProfessionInfos = function() return mock.childProfessions end,
+        GetConcentrationCurrencyID = function(id) return mock.concentrationIDs[id] or 0 end,
+        GetProfessionChildSkillLineID = function() return mock.childSkillLine end,
+        GetAllRecipeIDs = function() return mock.recipeIDs end,
+        GetRecipeCooldown = function(id)
+            local c = mock.recipeCooldowns[id]
+            if not c then return nil, false, 0, 0 end
+            return c[1], c[2], c[3], c[4]
+        end,
     }
+    _G.C_Secrets = { ShouldCooldownsBeSecret = function() return mock.cooldownsSecret end }
+    _G.C_CurrencyInfo = { GetCurrencyInfo = function(id) return mock.currencies[id] end }
+    _G.C_Spell = { GetSpellCharges = function(id) return mock.spellCharges[id] end }
     _G.C_Mail = { GetCraftingOrderMailInfo = function(i) return mock.mail[i] and mock.mail[i].craftingOrder end }
     _G.C_AuctionHouse = {
         queried = 0,
@@ -518,7 +540,10 @@ _G.C_AddOns = {
     end,
 }
 
+_G.EXPANSION_NAME10 = "The War Within"
+_G.EXPANSION_NAME11 = "Midnight"
 _G.Enum = {
+    ExpansionLevel = { WarWithin = 10, Midnight = 11 },
     BagIndex = { Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
         CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, CharacterBankTab_4 = 9,
         CharacterBankTab_5 = 10, CharacterBankTab_6 = 11,

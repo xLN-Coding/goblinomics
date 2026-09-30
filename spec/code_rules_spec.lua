@@ -17,7 +17,7 @@ describe("Code rules", function()
         assert.same({}, offenders)
     end)
 
-    it("never subscribes one bus event twice as the same module (the second handler would replace the first)", function()
+    it("never subscribes one bus or game event twice as the same module (the second handler would replace the first)", function()
         local p = io.popen('ls -d Modules/*/')
         local dups = {}
         for dir in p:lines() do
@@ -30,6 +30,10 @@ describe("Code rules", function()
                 for event in src:gmatch('[%a_]+:On%("([%u_]+)"') do
                     if seen[event] then dups[#dups + 1] = dir .. " " .. event end
                     seen[event] = true
+                end
+                for event in src:gmatch('[%a_]+:RegisterEvent%("([%u_]+)"') do
+                    if seen["event:" .. event] then dups[#dups + 1] = dir .. " RegisterEvent " .. event end
+                    seen["event:" .. event] = true
                 end
             end
             files:close()
