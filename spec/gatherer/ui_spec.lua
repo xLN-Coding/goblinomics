@@ -104,9 +104,9 @@ describe("Gatherer UI", function()
     end)
 
     it("shows the lockout grid for an instance farm in the tab", function()
-        ns.API.Routines = { Lockouts = function() return { ["xLN-Blackrock"] = { lockoutsScanned = 1, level = 80,
-            lockouts = { { name = "Liberation of Undermine", mapID = 2769, difficultyID = 15,
-                resetAt = WoWMock.now + 600, encounters = 8, progress = 5 } } } } end }
+        WoWMock.fire("UPDATE_INSTANCE_INFO")
+        GoblinomicsGathererDB.chars["xLN-Blackrock"].lockouts = { { name = "Liberation of Undermine", mapID = 2769,
+            difficultyID = 15, resetAt = WoWMock.now + 600, encounters = 8, progress = 5 } }
         local farm = pns.Farms.Create({ name = "Raid", category = "raid",
             instance = { journalID = 1296, mapID = 2769, name = "Liberation of Undermine", isRaid = true } })
         local page = buildTab()
@@ -115,8 +115,6 @@ describe("Gatherer UI", function()
         assert.equals("Can still run: Normal 1/1  \194\183  Heroic 1/1  \194\183  Mythic 1/1",
             pns.GathererUI.LockoutSummary(grid))
         assert.truthy(page)
-        ns.API.Routines = nil
-        assert.is_true(pns.Lockouts.Grid(farm).unavailable)          -- without Routines: a hint instead
     end)
 
     it("summarises farming sessions for the dashboard", function()

@@ -352,8 +352,6 @@ local function RefreshLockouts(farm)
     local data = {}
     for _, row in ipairs(grid.rows) do data[#data + 1] = { row = row, grid = grid } end
     lock.list:SetData(data)
-    lock.empty:SetText(grid.unavailable and L["Lockouts come from the Routines module: switch it on to see them."]
-        or L["No lockout data yet: log in once with every character at max level."])
     lock.empty:SetShown(#data == 0)
 end
 

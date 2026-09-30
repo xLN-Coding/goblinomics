@@ -1,4 +1,3 @@
--- Lockouts are read by the Routines module; the Gatherer shows them per instance farm.
 describe("Gatherer: lockouts", function()
     after_each(function() assert.same({}, WoWMock.errors) end)
 
@@ -7,7 +6,7 @@ describe("Gatherer: lockouts", function()
     local DUNGEON = { journalID = 1269, mapID = 2652, name = "The Stonevault", isRaid = false }
 
     before_each(function()
-        pns = select(3, load_routines({ gatherer = true, before = function()
+        pns = select(2, load_gatherer({ before = function()
             WoWMock.journal = {
                 { name = "The War Within",
                     raids = { { id = 1, name = "World Bosses", areaMapID = 0 },
@@ -63,9 +62,9 @@ describe("Gatherer: lockouts", function()
         assert.equals("1 The War Within: raids 1 (+1 skipped), dungeons 1 (+0 skipped)", lines[2])
     end)
 
-    it("stores active lockouts with difficulty and map ID plus level and class (Routines)", function()
+    it("stores active lockouts with difficulty and map ID plus level and class", function()
         WoWMock.fire("UPDATE_INSTANCE_INFO")
-        local c = GoblinomicsRoutinesDB.chars["xLN-Blackrock"]
+        local c = GoblinomicsGathererDB.chars["xLN-Blackrock"]
         assert.equals(2, #c.lockouts)
         assert.equals(15, c.lockouts[1].difficultyID)
         assert.equals(2769, c.lockouts[1].mapID)
@@ -76,7 +75,7 @@ describe("Gatherer: lockouts", function()
 
     it("builds the raid grid: progress per difficulty and who can still run it", function()
         WoWMock.fire("UPDATE_INSTANCE_INFO")
-        local chars = GoblinomicsRoutinesDB.chars
+        local chars = GoblinomicsGathererDB.chars
         chars["Alt-Blackrock"] = { lockoutsScanned = 1, level = 80, class = "MAGE", lockouts = {
             { name = "Liberation of Undermine", mapID = 2769, difficultyID = 14, resetAt = WoWMock.now + 600, encounters = 8,
                 progress = 8 },

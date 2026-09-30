@@ -44,8 +44,6 @@ What's inside:
   gold between your own characters doesn't count as income.
 - **Gatherer** tracks farm sessions and tells you your gold per hour.
 - **Workshop** knows what your reagents really cost you and what each craft earns.
-- **Routines** is your weekly gold checklist per character: learned weekly quests,
-  lockouts, world bosses, delves and patron orders, sorted by gold per minute.
 - **Dashboard** and **Insights** show it all over time: charts, a cash flow
   diagram, daily and weekly reports.
 - **Import** pulls in your old TSM Accounting or Journalator history.

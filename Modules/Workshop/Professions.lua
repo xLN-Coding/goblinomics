@@ -378,15 +378,14 @@ function Professions.Due(root, settings, now)
         for _, p in ipairs(e.professions) do
             if p.fullAt then
                 out[#out + 1] = { char = e.key, name = e.name, class = e.class, kind = "concentration",
-                    label = p.name, icon = p.icon, at = p.fullAt, id = "c:" .. e.key .. ":" .. p.id, lineID = p.id,
-                    max = p.max, expansion = p.expansion }
+                    label = p.name, icon = p.icon, at = p.fullAt, id = "c:" .. e.key .. ":" .. p.id }
             end
         end
         for _, cd in ipairs(e.cooldowns) do
             if cd.readyAt then
                 out[#out + 1] = { char = e.key, name = e.name, class = e.class, kind = "cooldown",
                     label = cd.name, icon = cd.icon, at = cd.readyAt, count = cd.count,
-                    id = "r:" .. e.key .. ":" .. cd.recipeID, recipeID = cd.recipeID, profession = cd.profession }
+                    id = "r:" .. e.key .. ":" .. cd.recipeID }
             end
         end
     end

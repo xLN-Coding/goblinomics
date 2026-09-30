@@ -19,7 +19,6 @@ PAIRS=(
     "Goblinomics_Ledger:Modules/Ledger"
     "Goblinomics_Gatherer:Modules/Gatherer"
     "Goblinomics_Workshop:Modules/Workshop"
-    "Goblinomics_Routines:Modules/Routines"
     "Goblinomics_Insights:Modules/Insights"
     "Goblinomics_Link:Modules/Link"
     "Goblinomics_Import:Modules/Import"

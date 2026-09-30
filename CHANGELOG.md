@@ -1,24 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
-### Added
-- Routines, a new module: your weekly and daily gold checklist per character,
-  sorted by gold per minute. It learns daily and weekly quests when you pick
-  them up, knows your raid and dungeon lockouts, world bosses, the delves of the
-  Great Vault, patron crafting orders and, from the Workshop, full concentration
-  and ready cooldowns. Nothing lands in your routine until you take it over from
-  the suggestions, so PvP weeklies and the like stay out of your way.
-- Value and time of a task are measured where possible (quest rewards, your
-  Gatherer runs in an instance) and can be set by hand. Other characters keep
-  their last state and count as open again after the reset.
-- Share routines as a text string, for example with your guild or community;
-  imported tasks arrive as suggestions.
-
-### Changed
-- Lockouts are tracked by Routines now. The Gatherer still shows who can run an
-  instance farm, with the data coming from Routines.
-
 ## [0.9.2-beta] - 2026-09-30
 
 ### Added

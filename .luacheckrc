@@ -26,7 +26,6 @@ globals = {
     "GoblinomicsVaultDB",
     "GoblinomicsLedgerDB",
     "GoblinomicsGathererDB",
-    "GoblinomicsRoutinesDB",
     "GoblinomicsWorkshopDB",
     "GoblinomicsInsightsDB",
     "Goblinomics_OnAddonCompartmentClick",
@@ -75,9 +74,7 @@ read_globals = {
     -- Namespaces
     "C_AddOns", "C_Timer", "C_Container", "C_Bank", "C_Item", "C_Mail",
     "C_TradeSkillUI", "C_RestrictedActions", "C_PlayerInfo", "C_AuctionHouse",
-    "C_CurrencyInfo", "C_Secrets", "C_Spell", "GetServerExpansionLevel", "C_DateAndTime", "GetQuestResetTime",
-    "GetNumSavedWorldBosses", "GetSavedWorldBossInfo", "C_WeeklyRewards", "GetQuestLogRewardMoney", "GetRewardMoney",
-    "GetNumQuestRewards", "GetNumQuestChoices", "GetQuestItemLink", "GetQuestItemInfo", "GetTitleText", "GetQuestID", "C_ChallengeMode", "C_EventUtils", "C_AddOnProfiler", "Enum",
+    "C_CurrencyInfo", "C_Secrets", "C_Spell", "GetServerExpansionLevel", "C_ChallengeMode", "C_EventUtils", "C_AddOnProfiler", "Enum",
     -- Libraries
     "LibStub",
     -- GlobalStrings
@@ -97,5 +94,5 @@ files["Locales/**"] = { max_line_length = false }
 
 files["spec/**"] = {
     std = "+busted",
-    globals = { "WoWMock", "load_addon_file", "load_core", "load_vault", "load_ledger", "load_gatherer", "load_workshop", "load_routines", "load_insights", "load_import", "load_link", "toc_files", "GoblinomicsTestDB" },
+    globals = { "WoWMock", "load_addon_file", "load_core", "load_vault", "load_ledger", "load_gatherer", "load_workshop", "load_insights", "load_import", "load_link", "toc_files", "GoblinomicsTestDB" },
 }
