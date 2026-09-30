@@ -1,12 +1,10 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Gatherer/Lockouts.lua
--- Saved instances per character for raid and dungeon farms. RequestRaidInfo()
--- at login, on entering the world and after boss kills; UPDATE_INSTANCE_INFO
--- reads GetSavedInstanceInfo (with difficulty ID and instance map ID, as
--- AlterEgo does) into db.char.lockouts, plus the character's level and class.
--- Lockouts.Grid builds the overview for a farm: one row per character at max
--- level with data, one column per difficulty, cells with the progress
--- ("5/10"), and per difficulty how many characters can still run it.
+-- Lockouts of raid and dungeon farms. The Routines module reads and stores the
+-- saved instances of every character (API.Routines:Lockouts()); without it there
+-- is no lockout data. Lockouts.Grid builds the overview for a farm: one row per
+-- character at max level with data, one column per difficulty, cells with the
+-- progress ("5/10"), and per difficulty how many characters can still run it.
 local _, ns = ...
 local CODE = setmetatable({}, { __index = function(_, k) return ns.API.Theme.CODE[k] end })
 
@@ -18,48 +16,12 @@ local RAID_DIFFICULTIES = { 14, 15, 16 }      -- Normal, Heroic, Mythic
 local DUNGEON_DIFFICULTIES = { 23 }           -- Mythic (Normal and Heroic dungeons have no lockout)
 local ORDER = { 17, 7, 3, 4, 14, 5, 6, 15, 16, 9, 1, 2, 23, 8 }
 
-local module
-local requestToken = 0
-
-local function Request()
-    if RequestRaidInfo then RequestRaidInfo() end
+--- charKey -> stored lockout data from Routines, or nil when the module is not there.
+local function Source()
+    local routines = ns.API.Routines
+    return routines and routines.Lockouts and routines:Lockouts() or nil
 end
-
-local function RequestSoon(delay)
-    requestToken = requestToken + 1
-    local token = requestToken
-    module:After(delay, function()
-        if token == requestToken then Request() end
-    end)
-end
-
-local function StoreCharacter(level)
-    local c = module.db.char
-    c.level = level or UnitLevel("player")
-    c.class = select(2, UnitClass("player"))
-end
-
---- Read the client's saved instances for the current character.
-function Lockouts.Read()
-    local now = time()
-    local list = {}
-    for i = 1, (GetNumSavedInstances() or 0) do
-        local name, _, reset, difficultyID, locked, extended, _, isRaid, _, difficultyName, numEncounters, progress,
-            _, mapID = GetSavedInstanceInfo(i)
-        if name and (locked or extended) and (reset or 0) > 0 then
-            list[#list + 1] = {
-                name = name, mapID = mapID, difficultyID = difficultyID, difficulty = difficultyName,
-                resetAt = now + reset, isRaid = isRaid == true, encounters = numEncounters, progress = progress,
-            }
-        end
-    end
-    local c = module.db.char
-    c.lockouts = list
-    c.lockoutsScanned = now
-    StoreCharacter()
-    ns.API.Emit("GATHERER_FARMS", { action = "lockouts" })
-    return list
-end
+Lockouts.Source = Source
 
 local function Matches(lock, instance)
     if instance.mapID and lock.mapID then return lock.mapID == instance.mapID end
@@ -88,6 +50,8 @@ end
 function Lockouts.Grid(farm)
     local instance = farm and farm.instance
     if type(instance) ~= "table" then return nil end
+    local source = Source()
+    if not source then return { instance = instance, columns = {}, rows = {}, unavailable = true } end
     local now = time()
     local maxLevel = MaxLevel()
     local seen, columns = {}, {}
@@ -97,7 +61,7 @@ function Lockouts.Grid(farm)
     end
     local total = ns.Instances and ns.Instances.EncounterCount(instance.journalID)
     local rows = {}
-    for charKey, c in pairs(module.db.root.chars) do
+    for charKey, c in pairs(source) do
         if type(c) == "table" and c.lockoutsScanned and (not maxLevel or (c.level or 0) >= maxLevel) then
             local row = { char = charKey, class = c.class, cells = {} }
             for _, lock in ipairs(c.lockouts or {}) do
@@ -143,18 +107,4 @@ function Lockouts.CellText(cell, total)
     local text = encounters and (cell.progress .. "/" .. encounters) or tostring(cell.progress)
     local cleared = encounters and cell.progress >= encounters
     return (cleared and CODE.bad or CODE.gold) .. text .. "|r"
-end
-
-function Lockouts.Enable(m)
-    module = m
-    m:RegisterEvent("UPDATE_INSTANCE_INFO", function() Lockouts.Read() end)
-    m:RegisterEvent("PLAYER_ENTERING_WORLD", function() RequestSoon(3) end)
-    m:RegisterEvent("BOSS_KILL", function() RequestSoon(2) end)
-    m:RegisterEvent("PLAYER_LEVEL_UP", function(_, level) StoreCharacter(level) end)
-    StoreCharacter()
-    Request()
-end
-
-function Lockouts.Disable()
-    requestToken = requestToken + 1
 end

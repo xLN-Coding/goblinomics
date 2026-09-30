@@ -14,7 +14,7 @@ ns.L = API.L
 local Gatherer = API.RegisterModule(ADDON_NAME, {
     apiVersion = 1,
     name = "Gatherer",
-    description = function() return API.L["Farm sessions with HUD, loot highlights and lockouts."] end,
+    description = function() return API.L["Farm sessions with HUD and loot highlights."] end,
     order = 30,
     db = {
         sv = "GoblinomicsGathererDB",
@@ -106,7 +106,7 @@ function ns.IsInstanceCategory(category)
     return category == "dungeon" or category == "raid"
 end
 
-local PARTS = { "Farms", "Session", "Highlights", "Lockouts", "Strings", "HUD", "Commands", "GathererUI" }
+local PARTS = { "Farms", "Session", "Highlights", "Strings", "HUD", "Commands", "GathererUI" }
 
 function Gatherer:OnInit()
     local root = self.db.root

@@ -1,6 +1,6 @@
 ## Interface: 120100, 120105
 ## Title: |cff3fbf3fGoblinomics|r Gatherer
-## Notes: Farms, session tracker, HUD, highlights, lockouts
+## Notes: Farms, session tracker, HUD, highlights
 ## Author: xLN
 ## Version: @project-version@
 ## Category: Goblinomics

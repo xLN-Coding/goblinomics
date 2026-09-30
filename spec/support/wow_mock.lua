@@ -105,10 +105,14 @@ function mock.reset()
     _G.GoblinomicsLedgerDB = nil
     _G.GoblinomicsGathererDB = nil
     _G.GoblinomicsWorkshopDB = nil
+    _G.GoblinomicsRoutinesDB = nil
     for i = 1, 4 do _G["SLASH_GOBLINOMICS" .. i] = nil end
     mock.repairCost = 0
     mock.durability = {}    -- durability[slot] = { current, max }
     mock.savedInstances = {} -- { name, id, reset, difficulty, locked, isRaid, difficultyName, ... }
+    mock.worldBosses = {}    -- { name, id, reset }
+    mock.weeklyReset = 3 * 86400
+    mock.dailyReset = 8 * 3600
     mock.sounds = {}
     mock.maxLevel = 80
     mock.journal = {}
@@ -337,6 +341,14 @@ _G.GetSavedInstanceInfo = function(i)
         s.isRaid or false, s.maxPlayers or 5, s.difficultyName or "Normal", s.numEncounters or 1, s.encounterProgress or 1,
         false, s.mapID
 end
+_G.GetNumSavedWorldBosses = function() return #mock.worldBosses end
+_G.GetSavedWorldBossInfo = function(i)
+    local b = mock.worldBosses[i]
+    if not b then return nil end
+    return b.name, b.id or i, b.reset or 3600
+end
+_G.C_DateAndTime = { GetSecondsUntilWeeklyReset = function() return mock.weeklyReset end }
+_G.GetQuestResetTime = function() return mock.dailyReset end
 _G.UnitLevel = function() return mock.player.level end
 _G.GetMaxLevelForPlayerExpansion = function() return mock.maxLevel end
 _G.GetDifficultyInfo = function(id)

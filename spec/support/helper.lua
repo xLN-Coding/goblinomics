@@ -110,6 +110,31 @@ function load_gatherer(opts)
     return ns, pns
 end
 
+--- Boot the core, optionally the Gatherer (opts.gatherer), and the Routines module.
+-- Returns core ns, routines ns, gatherer ns (or nil).
+function load_routines(opts)
+    opts = opts or {}
+    local ns = load_core({ boot = true, money = opts.money or 100000 })
+    if opts.before then opts.before(ns) end
+    local gns
+    if opts.gatherer then
+        gns = {}
+        for _, file in ipairs(toc_files("Modules/Gatherer/Goblinomics_Gatherer.toc", "Modules/Gatherer/")) do
+            load_addon_file(file, "Goblinomics_Gatherer", gns)
+        end
+        WoWMock.fire("ADDON_LOADED", "Goblinomics_Gatherer")
+    end
+    local rns = {}
+    for _, file in ipairs(toc_files("Modules/Routines/Goblinomics_Routines.toc", "Modules/Routines/")) do
+        load_addon_file(file, "Goblinomics_Routines", rns)
+    end
+    WoWMock.fire("ADDON_LOADED", "Goblinomics_Routines")
+    WoWMock.loggedIn = true
+    WoWMock.fire("PLAYER_LOGIN")
+    WoWMock.flush()
+    return ns, rns, gns
+end
+
 --- Boot the core, optionally the Ledger (opts.ledger), and the Workshop.
 -- Returns core ns, workshop ns, ledger ns (or nil).
 function load_workshop(opts)

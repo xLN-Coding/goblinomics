@@ -1,0 +1,14 @@
+## Interface: 120100, 120105
+## Title: |cff3fbf3fGoblinomics|r Routines
+## Notes: Weekly and daily gold routines per character: quests, lockouts, world bosses, delves, patron orders
+## Author: xLN
+## Version: @project-version@
+## Category: Goblinomics
+## Group: Goblinomics
+## Dependencies: Goblinomics
+## OptionalDeps: Goblinomics_Gatherer, Goblinomics_Workshop
+## SavedVariables: GoblinomicsRoutinesDB
+## IconTexture: Interface\AddOns\Goblinomics\Media\goblinomics_icon_64
+
+Routines.lua
+Instances.lua
