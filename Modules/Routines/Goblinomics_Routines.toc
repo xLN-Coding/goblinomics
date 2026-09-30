@@ -15,3 +15,5 @@ Tasks.lua
 Instances.lua
 Learn.lua
 Activities.lua
+Share.lua
+Presets.lua

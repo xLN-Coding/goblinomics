@@ -28,7 +28,7 @@ describe("Routines: tasks and learned quests", function()
         assert.equals("Weekly: Ore for the Forge", T.Get("q:500").name)
         assert.equals("daily", T.Get("q:501").frequency)
         assert.is_nil(T.Get("q:502"))
-        assert.equals(2, #T.Suggestions())
+        assert.equals(3, #T.Suggestions())                           -- plus the delve preset
         assert.equals(0, #T.Routine(ME))
     end)
 
