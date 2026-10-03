@@ -10,8 +10,8 @@ Auctionator, keeps everything in your SavedVariables, and sends nothing anywhere
 
 And yes, there's a goblin who gets more jealous the richer you are.
 
-Current version: **0.9.0-beta**. It's the first public beta, so expect rough edges
-and please tell me about them.
+Current version: **1.0.0**. If something breaks or looks wrong, please tell me
+about it.
 
 ## Installing
 

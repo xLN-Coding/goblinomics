@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [1.0.0] - 2026-10-04
+
+The first stable release. Thanks to everyone who tested the betas.
 
 ### Changed
 - Speculative items now start at 1000 gold per item. A cheap item that rarely
