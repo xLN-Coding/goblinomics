@@ -233,7 +233,7 @@ end
 local function OnLoot(_, p)
     local s = Session.Active()
     if not s or not s.runningSince then return end
-    if p.source and p.source.kind == "craft" then return end
+    if p.source and (p.source.kind == "craft" or p.source.kind == "disenchant") then return end
     local ctx = p.context or {}
     if not p.restricted and AnyWindow(ctx, NOT_FARMED) then return end
     s.items[p.itemKey] = (s.items[p.itemKey] or 0) + p.quantity

@@ -5,6 +5,8 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- single ones, otherwise the single pattern swallows the "x5". The loot source
 -- comes from the loot window (GetLootSourceInfo GUID type, fishing). Every item
 -- is recorded as a claim so the bag diff does not report it a second time.
+-- Loot of an item right after the player's own Disenchant cast is "disenchant",
+-- not "item", so it is never taken for farmed loot.
 local _, ns = ...
 
 local Loot = {}
@@ -17,6 +19,8 @@ local IsSecret = Restriction.IsSecret
 
 local CLAIM_TTL = 60
 local WINDOW_GRACE = 5
+local DISENCHANT = 13262
+local DISENCHANT_WINDOW = 3
 
 -- { GlobalString name, kind override }; order matters (multiple first).
 local PATTERNS = {
@@ -37,6 +41,7 @@ local windowOpen = false
 local windowClosedAt = -math.huge
 local claims = {}          -- itemKey -> { qty, time }
 local secretDropped = 0
+local disenchantAt = -math.huge
 
 --- Parse a loot line: link, quantity, kind override (nil|"push"|"bonus"|"craft").
 function Loot.Parse(msg)
@@ -65,12 +70,19 @@ local function OnLootReady()
     for k in pairs(sources) do sources[k] = nil end
     windowOpen = true
     local fishing = IsFishingLoot and IsFishingLoot()
+    local disenchant = GetTime() - disenchantAt <= DISENCHANT_WINDOW
     for slot = 1, GetNumLootItems() do
         local link = GetLootSlotLink(slot)
         if link and not IsSecret(link) then
-            sources[link] = fishing and "fishing" or GuidKind((GetLootSourceInfo(slot)))
+            local kind = fishing and "fishing" or GuidKind((GetLootSourceInfo(slot)))
+            if kind == "item" and disenchant then kind = "disenchant" end
+            sources[link] = kind
         end
     end
+end
+
+local function OnSpellSucceeded(_, unit, _, spellID)
+    if unit == "player" and not IsSecret(spellID) and spellID == DISENCHANT then disenchantAt = GetTime() end
 end
 
 local function OnLootClosed()
@@ -158,11 +170,13 @@ Bus.DefineService("loot", {
         events:Register("CHAT_MSG_LOOT", OnChatLoot)
         events:Register("LOOT_READY", OnLootReady)
         events:Register("LOOT_CLOSED", OnLootClosed)
+        events:Register("UNIT_SPELLCAST_SUCCEEDED", OnSpellSucceeded)
     end,
     stop = function()
         events:UnregisterAll()
         for k in pairs(claims) do claims[k] = nil end
         for k in pairs(sources) do sources[k] = nil end
         windowOpen = false
+        disenchantAt = -math.huge
     end,
 })
