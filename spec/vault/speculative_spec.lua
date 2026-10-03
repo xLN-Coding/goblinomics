@@ -8,6 +8,7 @@ describe("Vault: speculative items", function()
 
     before_each(function()
         ns, vns = load_vault()
+        ns.Price.Config().speculativeMinValue = 0   -- test prices are far below 1000 gold
         ns.Price.RegisterSource(fake("tsm", 10, {
             market = { ["i:1"] = 10000, ["i:3"] = 100000, ["i:5"] = 40000 },
             saleRate = { ["i:1"] = 0.5, ["i:3"] = 0.012, ["i:5"] = 0.02 },

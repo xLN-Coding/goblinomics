@@ -35,6 +35,7 @@ local CORE_DB = {
             preferred = "tsm",
             tsm = { market = "DBMarket", destroy = "Destroy", saleRate = "DBRegionSaleRate" },
             speculativeThreshold = 0.05,
+            speculativeMinValue = 10000000,   -- 1000 gold: cheaper items are never speculative
         },
     },
     charDefaults = {

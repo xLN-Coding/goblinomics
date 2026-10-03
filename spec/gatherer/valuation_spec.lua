@@ -7,6 +7,7 @@ describe("Gatherer: valuation", function()
 
     before_each(function()
         ns, pns = load_gatherer()
+        ns.Price.Config().speculativeMinValue = 0   -- test prices are far below 1000 gold
         V = pns.Valuation
         ns.Price.RegisterSource(fake("tsm", 10, {
             market = { ["i:1"] = 10000, ["i:2"] = 100, ["i:3"] = 500000, ["i:4"] = 1000 },

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed
+- Speculative items now start at 1000 gold per item. A cheap item that rarely
+  sells no longer clutters the Speculative tab, the bag marks or the
+  speculative share of your wealth. The amount can be changed under Settings >
+  Prices.
+
 ### Added
 - Market Pulse, a new "Market" tab in the Workshop: a board of the products you
   choose, no market scan. Put an item on it with "+ Market" next to a recipe in

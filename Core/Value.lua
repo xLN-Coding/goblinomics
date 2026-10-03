@@ -3,7 +3,8 @@ if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Valuation rule (one wealth figure):
 --   tradable with a market price -> market price (the vendor price when that is
 --            higher: nobody sells below it); tier "speculative" when the sale
---            rate is below the speculative threshold, else "market"
+--            rate is below the speculative threshold and the item is worth at
+--            least speculativeMinValue (1000 gold) each, else "market"
 --   tradable without a market price -> vendor price, tier "vendor" (grey junk
 --            and other items that cannot go to the auction house)
 --   bound -> tier "bound", unit 0 (not part of the wealth); vendorUnit is kept
@@ -45,7 +46,8 @@ function Value.Evaluate(itemKey, opts)
         r.unit, r.rule = market, "market"
         local rate = Fetch(r, itemKey, "saleRate")
         r.saleRate = rate
-        r.tier = (rate ~= nil and rate < cfg.speculativeThreshold) and "speculative" or "market"
+        local minValue = cfg.speculativeMinValue or 0
+        r.tier = (rate ~= nil and rate < cfg.speculativeThreshold and market >= minValue) and "speculative" or "market"
     elseif vendor and vendor > 0 then
         r.unit, r.rule, r.tier = vendor, "vendor", "vendor"
     end
