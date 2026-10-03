@@ -44,6 +44,12 @@ local function NewFrame(frameType, name, parent, template)
         return group
     end
     function frame:GetPoint() return "CENTER", nil, "CENTER", 0, 0 end
+    -- as in the client: colours are numbers, a table is an error (Usage: SetColorTexture(r, g, b [, a]))
+    function frame:SetColorTexture(r, g, b)
+        if type(r) ~= "number" or type(g) ~= "number" or type(b) ~= "number" then
+            error("Usage: self:SetColorTexture(r, g, b [, a])", 2)
+        end
+    end
     function frame:SetText(text) self._text = text end
     function frame:GetText() return self._text end
     -- Any other widget method (SetFrameStrata, SetTextColor, ...) is a no-op, so UI

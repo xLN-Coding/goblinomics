@@ -132,6 +132,8 @@ describe("Workshop: Market Pulse", function()
         assert.equals("i:42", V.ParseItem("42"))
         assert.equals("i:502", V.ParseItem("|cffffffff|Hitem:502::::::::80:::::|h[F]|h|r"))
         assert.is_nil(V.ParseItem("hello"))
+        local root = GoblinomicsWorkshopDB
+        root.pulse["i:502"] = { [P.Day(WoWMock.now - 86400)] = 1000, [P.Day(WoWMock.now)] = 800 }   -- draws a sparkline
         local tab = ns.UI.GetTab("workshop")
         tab.build(CreateFrame("Frame"))
         tab.onShow()

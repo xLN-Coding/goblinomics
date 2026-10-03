@@ -348,7 +348,7 @@ function View.Build(parent)
         for _, v in ipairs(data.spark or {}) do if v then values[#values + 1] = v end end
         row.spark:SetShown(#values >= 2)
         if #values >= 2 then
-            row.spark:SetColor(data.trend and data.trend < 0 and C.loss or C.accent)
+            row.spark:SetColor(unpack(data.trend and data.trend < 0 and C.loss or C.accent))
             row.spark:SetData(values)
         end
         c.rate:SetText(data.saleRate and API.Format:Percent(data.saleRate) or CODE.dim .. "-|r")
