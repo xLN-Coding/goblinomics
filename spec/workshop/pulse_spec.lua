@@ -40,18 +40,20 @@ describe("Workshop: Market Pulse", function()
         return list
     end
 
-    it("collects crafted, farmed and added items with a market price, without hidden ones", function()
+    it("shows only the items on your own list, with where they came from", function()
         S.craft(100, {}, { { S.result({ id = 502, quality = 2 }) } })
-        assert.same({ "i:502", "i:700" }, keys(P.Items()))              -- i:999 has no market price
+        assert.same({}, keys(P.Items()))                                -- nothing comes on its own
+        P.Add("i:502")
+        P.Add("i:700")
+        P.Add("i:800")
         local items = P.Items()
+        assert.same({ "i:502", "i:700", "i:800" }, keys(items))
         assert.is_true(items["i:502"].craft)
         assert.equals(40, items["i:700"].farmed)
-        P.Add("i:800")
-        assert.is_true(P.Items()["i:800"].manual)
-        P.Hide("i:700", true)
+        assert.is_nil(items["i:800"].craft or items["i:800"].farm)
+        assert.is_true(P.Has("i:700"))
+        P.Remove("i:700")
         assert.same({ "i:502", "i:800" }, keys(P.Items()))
-        P.Hide("i:700", false)
-        assert.equals(3, #keys(P.Items()))
     end)
 
     it("takes the trend from TSM, else from the own daily prices", function()
@@ -70,7 +72,8 @@ describe("Workshop: Market Pulse", function()
     end)
 
     it("stores the daily price once a day and prunes after 90 days", function()
-        S.craft(100, {}, { { S.result({ id = 502, quality = 2 }) } })
+        P.Add("i:502")
+        P.Add("i:700")
         P.Snapshot()
         WoWMock.flush()
         local root = GoblinomicsWorkshopDB
@@ -88,7 +91,8 @@ describe("Workshop: Market Pulse", function()
     end)
 
     it("warns only for items in stock below the threshold, toasts once a day and prints at login", function()
-        S.craft(100, {}, { { S.result({ id = 502, quality = 2 }) } })
+        P.Add("i:502")
+        P.Add("i:700")
         recent["i:502"], market14["i:502"] = 820, 1000                  -- -18 %, 5 in stock
         recent["i:700"], market14["i:700"] = 10, 50                     -- -80 %, nothing in stock
         local rows = P.Rows()
@@ -115,6 +119,8 @@ describe("Workshop: Market Pulse", function()
 
     it("filters, sorts and shows the view and its details", function()
         S.craft(100, {}, { { S.result({ id = 502, quality = 2 }) } })
+        P.Add("i:502")
+        P.Add("i:700")
         recent["i:502"], market14["i:502"] = 820, 1000
         local V = wns.WorkshopPulse
         local rows = P.Rows()
@@ -136,7 +142,33 @@ describe("Workshop: Market Pulse", function()
         assert.is_truthy(table.concat(left, "|"):find("Latest scan", 1, true))
         assert.is_truthy(table.concat(right, "|"):find("Posted 5, sold 3", 1, true))
         V.Detail().buttons[1]:GetScript("OnClick")(V.Detail().buttons[1], "LeftButton")
-        assert.is_true(GoblinomicsWorkshopDB.pulseHidden[rows[1].key])
+        assert.is_false(P.Has(rows[1].key))                            -- removed from the list
+        V.OpenAdd()
+        local d = V.Adder()
+        d.box:SetText("800")
+        d.box:GetScript("OnTextChanged")(d.box)
+        assert.equals("i:800", d.key)
+        d.buttons[2]:GetScript("OnClick")(d.buttons[2], "LeftButton")
+        assert.is_true(P.Has("i:800"))
         tab.onHide()
+    end)
+
+    it("puts a recipe's product on the list from the profession window and takes it off again", function()
+        local B = wns.ProfessionButton
+        assert.same({ "i:501", "i:502" }, B.Keys(100))                  -- every quality tier
+        assert.is_nil(B.Keys(nil))
+        assert.is_true(B.Toggle(100))
+        assert.is_true(P.Has("i:501") and P.Has("i:502"))
+        assert.is_false(B.Toggle(100))
+        assert.is_false(P.Has("i:501") or P.Has("i:502"))
+        local form = CreateFrame("Frame")
+        function form:GetRecipeInfo() return { recipeID = 100 } end
+        _G.ProfessionsFrame = { CraftingPage = { SchematicForm = form } }
+        B.Attach()
+        assert.equals("+ Market", B.button.label:GetText())
+        B.button:GetScript("OnClick")(B.button, "LeftButton")
+        assert.is_true(P.Has("i:502"))
+        assert.equals("- Market", B.button.label:GetText())
+        _G.ProfessionsFrame = nil
     end)
 end)

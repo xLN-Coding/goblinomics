@@ -1,10 +1,12 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/WorkshopPulse.lua
--- "Market" view of the Workshop (Market Pulse): one header row (search and "add item"
+-- "Market" view of the Workshop (Market Pulse): one header row (search and "Add item"
 -- on the left, source filter and "only warnings" on the right) and a sortable table of
--- your products: warning mark, item, source, stock, market price, trend (sparkline of
--- the own daily prices plus percent), your sale rate and average sale price. A click
--- opens the details: a larger price chart, TSM's values and your auction house figures.
+-- the products on your own list: warning mark, item, source, stock, market price, trend
+-- (sparkline of the own daily prices plus percent), your sale rate and average sale
+-- price. A click opens the details: a larger price chart, TSM's values and your auction
+-- house figures. Items come onto the list with "+ Market" in the profession window
+-- (ProfessionButton.lua) or with "Add item" (a small dialog with a preview).
 local _, ns = ...
 local CODE = setmetatable({}, { __index = function(_, k) return ns.API.Theme.CODE[k] end })
 
@@ -26,12 +28,11 @@ local function ItemName(key)
     return name or key, link
 end
 
---- "Craft", "Farm", "Craft, Farm" or "Added".
+--- "Craft", "Farm", "Craft, Farm" or "" (nothing in the last 30 days).
 function View.SourceText(row)
     local parts = {}
     if row.craft then parts[#parts + 1] = L["Craft"] end
     if row.farm then parts[#parts + 1] = L["Farm"] end
-    if #parts == 0 and row.manual then parts[1] = L["Added"] end
     return table.concat(parts, ", ")
 end
 
@@ -85,8 +86,8 @@ local function BuildDetail()
     local C, S = Theme.colors, Theme.space
     local d
     d = W.Dialog({ title = L["Market"], width = 560, height = 470, name = "GoblinomicsWorkshopPulse", buttons = {
-        { text = L["Hide from the board"], width = 170, onClick = function()
-            ns.Pulse.Hide(d.row.key, true)
+        { text = L["Remove from the list"], width = 170, onClick = function()
+            ns.Pulse.Remove(d.row.key)
             d:Hide()
         end },
         { text = L["Close"], primary = true, onClick = function() d:Hide() end },
@@ -172,6 +173,94 @@ function View.ParseItem(text)
     return id and ("i:" .. id) or nil
 end
 
+local adder
+
+local function AddPreview(d)
+    local key = View.ParseItem(d.box:GetText())
+    d.key = key
+    if not key then
+        d.preview:SetText(ns.API.Theme.Colorize(L["Shift-click an item or type an item ID."], ns.API.Theme.colors.textDim))
+        d.icon:Hide()
+        return
+    end
+    local id = tonumber(key:match("^i:(%d+)"))
+    local name, link = ItemName(key)
+    d.icon:SetTexture(id and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id) or 134400)
+    d.icon:Show()
+    d.preview:SetText((link or name) .. (ns.Pulse.Has(key) and ("  " .. CODE.dim .. L["already on the list"] .. "|r") or ""))
+end
+
+local function OnInsertLink(text)
+    if adder and adder:IsShown() and adder.box:HasFocus() then
+        adder.box:SetText(text or "")
+        AddPreview(adder)
+        return true
+    end
+end
+
+local hooked = false
+local function HookLinks()
+    if hooked then return end
+    hooked = true
+    if ChatFrameUtil and ChatFrameUtil.InsertLink then
+        hooksecurefunc(ChatFrameUtil, "InsertLink", OnInsertLink)
+    elseif ChatEdit_InsertLink then
+        hooksecurefunc("ChatEdit_InsertLink", OnInsertLink)
+    end
+end
+
+--- The "Add item" dialog: explanation, one field (shift-click an item or an item ID)
+-- and a preview of the item before it goes onto the list.
+function View.OpenAdd()
+    local API = ns.API
+    local W, Theme = API.Widgets, API.Theme
+    local C, S = Theme.colors, Theme.space
+    if not adder then
+        local d
+        d = W.Dialog({ title = L["Add item"], width = 420, height = 210, name = "GoblinomicsWorkshopPulseAdd", buttons = {
+            { text = L["Close"], onClick = function() d:Hide() end },
+            { text = L["Add"], primary = true, onClick = function()
+                if d.key then
+                    ns.Pulse.Add(d.key)
+                    d.box:SetText("")
+                    AddPreview(d)
+                end
+            end },
+        } })
+        local hint = Theme.Text(d.body, "small", C.textDim)
+        hint:SetPoint("TOPLEFT", 0, 0)
+        hint:SetPoint("RIGHT", d.body, "RIGHT", 0, 0)
+        hint:SetJustifyH("LEFT")
+        hint:SetText(L["Click into the field, then shift-click an item in your bags, the profession window or chat. An item ID works too."])
+        local box = CreateFrame("EditBox", nil, d.body)
+        box:SetSize(380, S.CONTROL_H)
+        box:SetPoint("TOPLEFT", 0, -36)
+        box:SetAutoFocus(false)
+        box:SetFontObject(Theme.Font(12))
+        box:SetTextInsets(6, 6, 0, 0)
+        Theme.Backdrop(box, C.button, C.border)
+        box:SetScript("OnTextChanged", function() AddPreview(d) end)
+        box:SetScript("OnEnterPressed", function() d.buttons[2]:GetScript("OnClick")(d.buttons[2], "LeftButton") end)
+        box:SetScript("OnEscapePressed", function() d:Hide() end)
+        d.box = box
+        d.icon = d.body:CreateTexture(nil, "ARTWORK")
+        d.icon:SetSize(20, 20)
+        d.icon:SetPoint("TOPLEFT", 0, -36 - S.CONTROL_H - S.GAP)
+        d.preview = Theme.Text(d.body, "body", C.text)
+        d.preview:SetPoint("LEFT", d.icon, "RIGHT", S.SM, 0)
+        d.preview:SetPoint("RIGHT", d.body, "RIGHT", 0, 0)
+        d.preview:SetWordWrap(false)
+        adder = d
+        HookLinks()
+    end
+    adder.box:SetText("")
+    AddPreview(adder)
+    adder:Show()
+    adder.box:SetFocus()
+end
+
+function View.Adder() return adder end
+
 -- View -------------------------------------------------------------------------------------------
 function View.Build(parent)
     local API = ns.API
@@ -190,19 +279,9 @@ function View.Build(parent)
     search:HookScript("OnTextChanged", function(self, userInput)
         if userInput then state.search = self:GetText(); refresh() end
     end)
-    local add = W.EditBox(f, { width = 150, tooltip = L["Add an item: shift-click it or type its item ID, then Enter."],
-        get = function() return "" end,
-        set = function(text)
-            local key = View.ParseItem(text)
-            if not key then return false, L["Shift-click an item or type an item ID."] end
-            ns.Pulse.Add(key)
-            return true
-        end })
+    local add = W.Button(f, L["Add item"], { auto = true, onClick = function() View.OpenAdd() end })
     add:SetPoint("LEFT", search, "RIGHT", S.SM, 0)
     page.add = add
-    local hint = Theme.Text(f, "small", C.textDim)
-    hint:SetPoint("LEFT", add, "RIGHT", S.SM, 0)
-    hint:SetText(L["+ item"])
     local only = W.Checkbox(f, L["Only warnings"], function() return state.onlyWarnings end, function(on)
         state.onlyWarnings = on
         refresh()
@@ -279,7 +358,8 @@ function View.Build(parent)
     page.list = W.ScrollList(f, { rowHeight = S.ROW, init = InitRow })
     page.list.box:SetPoint("TOPLEFT", 0, headerY - S.HEADER_H - S.XS)
     page.list.box:SetPoint("BOTTOMRIGHT", 0, 0)
-    page.empty = W.EmptyState(page.list.box, L["No products yet: craft or farm something, or add an item."])
+    page.empty = W.EmptyState(page.list.box,
+        L["Your list is empty. Add items with \"+ Market\" in a profession window or with \"Add item\"."])
     page.columns = columns
 
     function page.Refresh()

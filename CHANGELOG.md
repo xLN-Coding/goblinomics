@@ -3,13 +3,15 @@
 ## [Unreleased]
 
 ### Added
-- Market Pulse, a new "Market" tab in the Workshop: a board of the things you
-  craft or farm, no market scan. Stock, market price, a price trend with a
-  small chart, your own sale rate and average sale price. Goblinomics keeps
-  the price of these items once a day, so the chart grows over time; with TSM
-  the trend works from day one. Items you have in stock that drop by 15 % or
-  more are flagged, and you get a toast and a chat line about it (both can be
-  switched off, the threshold is adjustable). Add or hide items as you like.
+- Market Pulse, a new "Market" tab in the Workshop: a board of the products you
+  choose, no market scan. Put an item on it with "+ Market" next to a recipe in
+  the profession window, or with "Add item" (shift-click or item ID). For each
+  item you see your stock, its market price, a price trend with a small chart,
+  your own sale rate and average sale price. Goblinomics keeps the price of
+  these items once a day, so the chart grows over time; with TSM the trend
+  works from day one. Items you have in stock that drop by 15 % or more are
+  flagged, and you get a toast and a chat line about it (both can be switched
+  off, the threshold is adjustable).
 
 ## [0.9.2-beta] - 2026-09-30
 

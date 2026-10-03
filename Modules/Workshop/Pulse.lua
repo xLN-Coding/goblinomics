@@ -1,9 +1,9 @@
 if GOBLINOMICS_CLIENT_BLOCKED then return end
 -- Modules/Workshop/Pulse.lua
 -- Market Pulse: the market of your own products, no market scan.
---   items     what you crafted (Stats) or farmed (Gatherer sessions) in the last
---             pulseDays days, plus items added by hand; hidden ones and items
---             without a market price are left out
+--   items     only the list you keep yourself (root.pulseManual): added in the
+--             profession window ("+ Market") or with "Add item"; whether you crafted
+--             or farmed an item in the last 30 days is shown as its source
 --   trend     TSM's latest scan against its 14-day value (DBRecent / DBMarket - 1);
 --             without TSM today's own snapshot against the average of the last 14 days
 --   history   once a day the market price of every board item (root.pulse[key][day]),
@@ -27,45 +27,40 @@ Pulse.Day = Day
 local function Root() return module.db.root end
 local function Settings() return module.db.settings end
 
---- Board items: key -> { key, craft = true, farm = true, manual = true, farmed = qty }.
+local SOURCE_DAYS = 30
+
+--- Board items: key -> { key, craft = true, farm = true, farmed = qty } for the items on
+-- your list; craft and farm tell where it came from in the last 30 days.
 function Pulse.Items(now)
     now = now or time()
-    local root, settings = Root(), Settings()
-    local from = now - (settings.pulseDays or 30) * 86400
+    local root = Root()
     local items = {}
-    local function Add(key, source)
-        if type(key) ~= "string" then return nil end
-        local e = items[key]
-        if not e then
-            e = { key = key }
-            items[key] = e
-        end
-        e[source] = true
-        return e
-    end
+    for key in pairs(root.pulseManual or {}) do items[key] = { key = key } end
+    if not next(items) then return items end
+    local from = now - SOURCE_DAYS * 86400
     for _, r in ipairs(ns.Stats.Recipes({ from = from })) do
-        local any = false
         for _, q in ipairs(r.qualityList or {}) do
-            if q.key and (q.made or 0) > 0 then Add(q.key, "craft"); any = true end
+            if q.key and items[q.key] and (q.made or 0) > 0 then items[q.key].craft = true end
         end
-        if not any and r.output and (r.made or 0) > 0 then Add(r.output, "craft") end
+        if r.output and items[r.output] and (r.made or 0) > 0 then items[r.output].craft = true end
     end
     local gatherer = API().Gatherer
     if gatherer and gatherer.Summaries then
         for _, s in ipairs(gatherer:Summaries(from) or {}) do
             for key, qty in pairs(s.items or {}) do
-                local e = Add(key, "farm")
-                if e then e.farmed = (e.farmed or 0) + (qty or 0) end
+                local e = items[key]
+                if e then
+                    e.farm = true
+                    e.farmed = (e.farmed or 0) + (qty or 0)
+                end
             end
         end
     end
-    for key in pairs(root.pulseManual or {}) do Add(key, "manual") end
-    for key in pairs(root.pulseHidden or {}) do items[key] = nil end
-    for key in pairs(items) do
-        if not API().Price:Get(key, "market") then items[key] = nil end
-    end
     return items
 end
+
+--- Is an item on your list?
+function Pulse.Has(key) return key ~= nil and Root().pulseManual[key] == true end
 
 --- Market prices of the last `days` days from the own snapshots, oldest first (nil for missing days).
 function Pulse.History(key, days, now)
@@ -101,7 +96,7 @@ function Pulse.Rows(now)
     local threshold = (Settings().pulseThreshold or 15) / 100
     local rows = {}
     for key, e in pairs(Pulse.Items(now)) do
-        local row = { key = key, craft = e.craft, farm = e.farm, manual = e.manual }
+        local row = { key = key, craft = e.craft, farm = e.farm }
         row.market = A.Price:Get(key, "market")
         row.stock = A.Vault and A.Vault.ItemCount and A.Vault:ItemCount(key) or nil
         row.trend, row.trendSource = Pulse.Trend(key, now)
@@ -163,20 +158,19 @@ end
 function Pulse.Add(key)
     if type(key) ~= "string" then return end
     Root().pulseManual[key] = true
-    Root().pulseHidden[key] = nil
     API().Emit("WORKSHOP_PULSE", {})
 end
 
-function Pulse.Hide(key, on)
-    Root().pulseHidden[key] = on and true or nil
-    if on then Root().pulseManual[key] = nil end
+function Pulse.Remove(key)
+    Root().pulseManual[key] = nil
     API().Emit("WORKSHOP_PULSE", {})
 end
 
 function Pulse.Enable(m)
     module = m
     local root = m.db.root
-    for _, k in ipairs({ "pulse", "pulseManual", "pulseHidden", "pulseNotices" }) do
+    root.pulseHidden = nil   -- the board is your own list now; nothing to hide
+    for _, k in ipairs({ "pulse", "pulseManual", "pulseNotices" }) do
         if type(root[k]) ~= "table" then root[k] = {} end
     end
     API().On("PRICES_CHANGED", function() Pulse.Snapshot() end, "Goblinomics_Workshop.Pulse")

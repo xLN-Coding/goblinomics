@@ -404,6 +404,7 @@ local function OnTradeSkill()
     pendingRead = true
     module:After(0.5, function()
         pendingRead = false
+        if ns.ProfessionButton then ns.ProfessionButton.Attach() end
         Professions.ReadWindow()
         local line = C_TradeSkillUI and C_TradeSkillUI.GetProfessionChildSkillLineID
             and C_TradeSkillUI.GetProfessionChildSkillLineID() or 0
