@@ -37,6 +37,27 @@ describe("UI: components", function()
         assert.is_table(cells.value)
     end)
 
+    it("keeps the sort mark inside its own head, never over the neighbour", function()
+        local key = "value"
+        local cols = W.Columns({ { key = "name", label = "Name", sortable = true, width = 120 },
+            { key = "value", label = "Value", width = 80, align = "RIGHT", sortable = true } },
+            { onSort = function() end, sortKey = function() return key end })
+        local header = cols:Header(CreateFrame("Frame"))
+        local right = header.cells[2]
+        local p = right.chevron._points[#right.chevron._points]
+        assert.same({ "RIGHT", right, "RIGHT", 0, 0 }, p)                -- at its own right edge
+        local lp = right.label._points[#right.label._points]
+        assert.equals(-9, lp[2])                                          -- the sorted text makes room
+        key = "name"
+        cols:RefreshHeader()
+        lp = right.label._points[#right.label._points]
+        assert.equals(0, lp[2])                                           -- unsorted: flush with its values
+        local left = header.cells[1]
+        p = left.chevron._points[#left.chevron._points]
+        assert.equals(left, p[2])
+        assert.is_true(p[4] >= 0 and p[4] <= 120 - 9)                     -- inside the column
+    end)
+
     it("builds dialogs with a close button and a button row", function()
         local clicked
         local d = W.Dialog({ title = "Goals", buttons = { { text = "Close", primary = true, onClick = function() clicked = true end } } })
