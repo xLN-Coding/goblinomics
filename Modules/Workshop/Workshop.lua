@@ -27,6 +27,9 @@ local Workshop = API.RegisterModule(ADDON_NAME, {
             concentrationThreshold = 1000,   -- notices when concentration reaches this
             notifyToast = true, notifyChat = true, notifyTooltip = true,
             professionsHidden = {},   -- charKey -> true: left out of concentration and cooldowns
+            pulseDays = 30,           -- Market Pulse: items crafted or farmed within this many days
+            pulseThreshold = 15,      -- warning when the price is this many percent below its 14-day value
+            pulseToast = true, pulseChat = true,
         },
         charDefaults = {},
     },
@@ -34,8 +37,8 @@ local Workshop = API.RegisterModule(ADDON_NAME, {
 ns.Workshop = Workshop
 
 local PARTS = { "Recipes", "Reagents", "Purchases", "CraftTracker", "Lots", "Orders", "Concentration", "Salvage",
-    "Stats", "Retention", "Recompute", "Professions", "ProfessionNotices",
-    "WorkshopSummary", "WorkshopUI", "WorkshopProfessions" }
+    "Stats", "Retention", "Recompute", "Professions", "ProfessionNotices", "Pulse", "PulseNotices",
+    "WorkshopSummary", "WorkshopUI", "WorkshopProfessions", "WorkshopPulse" }
 
 function Workshop:OnInit()
     local root = self.db.root

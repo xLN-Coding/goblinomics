@@ -327,6 +327,32 @@ local function BuildSettings(parent, y)
     form:Toggle({ label = L["Line in the minimap tooltip"], description = L["How many are ready and when the next one is."],
         get = function() return settings.notifyTooltip end,
         set = function(on) settings.notifyTooltip = on end })
+    form:Group(L["Market"], L["Your own products: what you crafted or farmed, with their price trend."])
+    form:Number({ label = L["Products from the last (days)"],
+        description = L["Items crafted or farmed within this time come onto the board."], min = 1,
+        get = function() return settings.pulseDays end,
+        set = function(n) settings.pulseDays = n; API.Emit("WORKSHOP_PULSE", {}) end })
+    form:Slider({ label = L["Warn at a price drop of (%)"],
+        description = L["Compared with the 14-day price; only items you have in stock."], min = 5, max = 50, step = 1,
+        get = function() return settings.pulseThreshold end,
+        set = function(v) settings.pulseThreshold = v; API.Emit("WORKSHOP_PULSE", {}) end })
+    form:Toggle({ label = L["Toast on a price drop"], description = L["Once per item and day."],
+        get = function() return settings.pulseToast end,
+        set = function(on) settings.pulseToast = on end })
+    form:Toggle({ label = L["Price drops in chat at login"], description = L["One line with every warned item."],
+        get = function() return settings.pulseChat end,
+        set = function(on) settings.pulseChat = on end })
+    local hidden = {}
+    for key in pairs(module.db.root.pulseHidden or {}) do hidden[#hidden + 1] = key end
+    table.sort(hidden)
+    for _, key in ipairs(hidden) do
+        local id = tonumber(key:match("^i:(%d+)"))
+        local name = id and C_Item.GetItemInfo(id) or key
+        form:Toggle({ label = API.Lf("Hidden: %s", name), description = L["Switch on to show it on the board again."],
+            get = function() return false end,
+            set = function(on) if on then ns.Pulse.Hide(key, false) end end })
+    end
+
     local chars = {}
     for charKey, c in pairs(module.db.root.chars) do
         if type(c) == "table" and (next(c.professions or {}) or next(c.cooldowns or {})) then chars[#chars + 1] = charKey end
@@ -387,12 +413,14 @@ function UI.Enable(m)
         build = BuildTab,
         onShow = function()
             UI.Refresh()
-            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS" }) do
+            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS",
+                "WORKSHOP_PULSE" }) do
                 API.On(event, UI.Refresh, OWNER)
             end
         end,
         onHide = function()
-            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS" }) do
+            for _, event in ipairs({ "WORKSHOP_CRAFT", "WORKSHOP_MATCH", "WORKSHOP_ORDER", "WORKSHOP_PROFESSIONS",
+                "WORKSHOP_PULSE" }) do
                 API.Off(event, OWNER)
             end
         end,

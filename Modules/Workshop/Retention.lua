@@ -73,6 +73,7 @@ function Retention.Run(now)
         if lot.time >= lotCutoff then lots[#lots + 1] = lot end
     end
     root.lots = lots
+    if ns.Pulse then ns.Pulse.Prune(now) end
 end
 
 function Retention.Enable(m)
