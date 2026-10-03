@@ -53,6 +53,21 @@ describe("Tracking: loot", function()
         assert.equals("push", got.LOOT_RECEIVED[2].source.kind)
     end)
 
+    it("marks loot of an item right after the own Disenchant cast as disenchant", function()
+        WoWMock.loot = { { link = LINCLOTH, sources = { "Item-0-1-2-3", 1 } } }
+        WoWMock.fire("LOOT_READY")
+        loot("You receive loot: " .. LINCLOTH .. ".")
+        assert.equals("item", got.LOOT_RECEIVED[1].source.kind)
+        WoWMock.fire("UNIT_SPELLCAST_SUCCEEDED", "party1", "Cast-1", 13262)    -- not the player
+        WoWMock.fire("LOOT_READY")
+        loot("You receive loot: " .. LINCLOTH .. ".")
+        assert.equals("item", got.LOOT_RECEIVED[2].source.kind)
+        WoWMock.fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-2", 13262)
+        WoWMock.fire("LOOT_READY")
+        loot("You receive loot: " .. LINCLOTH .. ".")
+        assert.equals("disenchant", got.LOOT_RECEIVED[3].source.kind)
+    end)
+
     it("uses unknown for secret source GUIDs", function()
         local guid = "Creature-secret"
         WoWMock.set_secret(guid)

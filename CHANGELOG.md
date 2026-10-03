@@ -19,6 +19,10 @@
   flagged, and you get a toast and a chat line about it (both can be switched
   off, the threshold is adjustable).
 
+### Fixed
+- Items from disenchanting no longer count as farmed loot in a Gatherer
+  session. Loot from boxes and other opened items still counts.
+
 ## [0.9.2-beta] - 2026-09-30
 
 ### Added

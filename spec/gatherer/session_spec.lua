@@ -69,6 +69,20 @@ describe("Gatherer: session tracker", function()
         assert.equals(4, Session.Active().items["i:210796"])
     end)
 
+    it("skips the yield of disenchanting, but keeps loot from opened items", function()
+        Session.Start(nil)
+        WoWMock.fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-1", 13262)
+        WoWMock.loot = { { link = HERB, sources = { "Item-0-1-2-3", 2 } } }
+        WoWMock.fire("LOOT_READY")
+        lootLine(HERB, 2)
+        WoWMock.fire("LOOT_CLOSED")
+        assert.is_nil(Session.Active().items["i:210796"])
+        WoWMock.advance(10)                                             -- a box opened later is farm loot
+        WoWMock.fire("LOOT_READY")
+        lootLine(HERB, 3)
+        assert.equals(3, Session.Active().items["i:210796"])
+    end)
+
     it("counts non-loot gains in realized only; transfers not at all", function()
         Session.Start(nil)
         WoWMock.fire("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", Enum.PlayerInteractionType.Merchant)
