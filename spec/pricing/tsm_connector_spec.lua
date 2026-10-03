@@ -28,6 +28,13 @@ describe("Pricing: TSM connector", function()
         assert.equals(450, (ns.Price.Get("i:1", "market")))
     end)
 
+    it("answers named sources (DBRecent, DBHistorical) and rejects other strings", function()
+        boot({ DBMarket = { ["i:1"] = 500, ["i:2589"] = 1 }, DBRecent = { ["i:1"] = 410 }, DBHistorical = { ["i:212072"] = 9 } })
+        assert.same({ 410, "tsm" }, { ns.Price.Query("i:1", "DBRecent") })
+        assert.equals(9, (ns.Price.Query("i:212072::1:6652", "DBHistorical")))   -- base key fallback
+        assert.is_nil(ns.Price.Query("i:1", "DBMarket*2"))
+    end)
+
     it("falls back to the base key for gear variants", function()
         boot({ DBMarket = { ["i:212072"] = 777 } })
         assert.equals(777, (ns.Price.Get("i:212072::1:6652", "market")))

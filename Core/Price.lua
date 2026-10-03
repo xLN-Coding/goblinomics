@@ -180,6 +180,19 @@ function Price.Sources()
     return list
 end
 
+--- Value of a named source of any registered provider (e.g. TSM's "DBRecent"):
+-- value, sourceId; nil when no source knows it.
+function Price.Query(itemKey, name)
+    if type(itemKey) ~= "string" or type(name) ~= "string" then return nil end
+    for id, src in pairs(sources) do
+        if src.Query then
+            local ok, value = SafeCall(src.Query, src, itemKey, name)
+            if ok and type(value) == "number" then return value, id end
+        end
+    end
+    return nil
+end
+
 function Price.GetSource(id)
     return sources[id]
 end
@@ -193,4 +206,5 @@ ns.API.Price = {
     Config = function() return Price.Config() end,
     GetSource = function(_, id) return Price.GetSource(id) end,
     HasRole = function(_, role) return Price.HasRole(role) end,
+    Query = function(_, itemKey, name) return Price.Query(itemKey, name) end,
 }

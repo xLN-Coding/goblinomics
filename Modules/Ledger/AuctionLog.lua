@@ -200,6 +200,7 @@ local function Build(days)
                 s.sold = s.sold + 1
                 s.soldQuantity = s.soldQuantity + (e[QTY] or 1)
                 s.revenue = s.revenue + (e[AMT] or 0)
+                if not s.lastSale or e[T] > s.lastSale then s.lastSale = e[T] end
             elseif kind == "expired" then
                 s.expired = s.expired + 1
                 s.depositLost = s.depositLost + (e[DEP] or 0)

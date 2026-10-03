@@ -41,7 +41,32 @@ local Vault = API.RegisterModule(ADDON_NAME, {
 ns.Vault = Vault
 
 -- Public, read-only: other modules read the wealth and its history.
+--- Tradable quantity of an item over every character (bags, bank, mail, auctions)
+-- and the warband bank; bound units and equipped gear are not counted.
+local function ItemCount(root, itemKey)
+    local total = 0
+    local function Add(loc, location)
+        if type(loc) ~= "table" or type(loc.items) ~= "table" then return end
+        local n = loc.items[itemKey] or 0
+        if n > 0 then
+            local bound = location ~= "auctions" and loc.bound and loc.bound[itemKey] or 0
+            total = total + n - math.min(n, bound)
+        end
+    end
+    for _, c in pairs(root.chars or {}) do
+        local locs = type(c) == "table" and c.locations
+        if type(locs) == "table" then
+            for _, id in ipairs({ "bags", "bank", "mail", "auctions" }) do Add(locs[id], id) end
+        end
+    end
+    Add(root.warband, "warband")
+    return total
+end
+Vault.ItemCount = ItemCount
+
 API.Vault = {
+    --- Tradable quantity of an item over all characters and the warband bank (stored state).
+    ItemCount = function(_, itemKey) return Vault.db and ItemCount(Vault.db.root, itemKey) or 0 end,
     --- Current networth result (nil until the first computation).
     Current = function() return ns.Networth and ns.Networth.Get() end,
     --- Daily history: { ["YYYY-MM-DD"] = { wealth, speculative, gold, chars, warband } }.

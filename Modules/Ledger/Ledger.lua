@@ -111,6 +111,16 @@ API.Ledger = {
         if not (ns.Ledger.db and ns.Dedup) then return nil end
         return ns.Dedup.Import(ns.Ledger.db.root, batch, dryRun)
     end,
+    --- Auction house statistics of an item for the last `days` days (nil = all time), or nil:
+    -- { posted, sold, soldQuantity, expired, cancelled, revenue, depositLost, saleRate,
+    --   averagePrice, lastSale, purchases, purchasedQuantity, spent, averagePurchasePrice }
+    AuctionStats = function(_, itemKey, days)
+        local s = ns.AuctionLog and ns.AuctionLog.Stats(itemKey, days)
+        if not s then return nil end
+        local copy = {}
+        for k, v in pairs(s) do copy[k] = v end
+        return copy
+    end,
     --- Remove everything an import added: bookings, auction log events.
     RemoveImport = function(_, source)
         if not ns.Ledger.db then return 0, 0 end

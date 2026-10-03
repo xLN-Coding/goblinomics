@@ -50,6 +50,17 @@ function Source:Get(key, role)
     return value
 end
 
+--- Value of a named TSM price source (e.g. "DBRecent", "DBHistorical") for an item, or nil.
+function Source:Query(key, name)
+    if type(name) ~= "string" or not name:match("^[%w]+$") then return nil end
+    local value = Query(name, key)
+    if not value then
+        local base = API.ItemKey.Base(key)
+        if base and base ~= key then value = Query(name, base) end
+    end
+    return value
+end
+
 function Source:Status()
     if Query("DBMarket", PROBE_ITEM) == nil then
         return { available = true, note = L["TSM desktop app data missing: no DB* prices"] }
