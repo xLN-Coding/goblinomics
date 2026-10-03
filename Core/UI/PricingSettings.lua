@@ -69,6 +69,13 @@ UI.RegisterSettings({
                     cfg.speculativeThreshold = v
                     Price.Invalidate()
                 end })
+            form:Number({ label = L["Speculative from (gold per item)"],
+                description = L["Cheaper items are never speculative, so the list stays free of junk."], min = 0,
+                get = function() return math.floor((cfg.speculativeMinValue or 0) / 10000) end,
+                set = function(n)
+                    cfg.speculativeMinValue = math.max(0, n) * 10000
+                    Price.Invalidate()
+                end })
         end
 
         form:Group(L["Price sources"])

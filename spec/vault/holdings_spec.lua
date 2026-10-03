@@ -116,4 +116,12 @@ describe("Vault: items per character", function()
         WoWMock.flush()
         tab.onHide()
     end)
+
+    it("counts an item's tradable stock over all characters and the warband bank", function()
+        local r = root()
+        -- Main: bags 2, auctions 1 (equipment left out); Alt: mail 9; warband: its one unit is bound
+        assert.equals(12, vns.Vault.ItemCount(r, "i:3"))
+        assert.equals(4, vns.Vault.ItemCount(r, "i:5"))              -- bags 3 with 1 bound, warband 2
+        assert.equals(0, vns.Vault.ItemCount(r, "i:404"))
+    end)
 end)

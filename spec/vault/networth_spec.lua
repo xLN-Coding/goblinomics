@@ -9,6 +9,7 @@ describe("Vault: networth", function()
 
     before_each(function()
         ns, vns = load_vault({ login = false })
+        ns.Price.Config().speculativeMinValue = 0   -- test prices are far below 1000 gold
         values = {
             market = { ["i:1"] = 10000, ["i:2"] = 5000, ["i:3"] = 100000 },
             saleRate = { ["i:1"] = 0.5, ["i:2"] = 0.1, ["i:3"] = 0.01 },

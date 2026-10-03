@@ -83,6 +83,7 @@ end
 -------------------------------------------------------------------------------
 -- Columns: table header and row cells from one spec
 -------------------------------------------------------------------------------
+local SORT_MARK = 9   -- room for the sort chevron inside a header cell
 --- columns = { { key, label, width, align = "LEFT"|"RIGHT", sortable } }; exactly one column
 -- may have width = nil and takes the remaining space. Columns before it are anchored to
 -- the left, columns after it to the right, so header and rows always line up.
@@ -134,11 +135,11 @@ function Widgets.Columns(columns, opts)
             Place(cell, i, h)
             cell.label:SetJustifyH(c.align or "LEFT")
             if c.sortable and opts.onSort then
+                -- the sort mark stays inside its own column: right-aligned heads keep it at the
+                -- right edge (the text moves left), left-aligned ones right after the text
                 cell.chevron = Widgets.Chevron(cell, "down", 6)
                 if (c.align or "LEFT") == "RIGHT" then
-                    cell.chevron:SetPoint("RIGHT", cell.label, "LEFT", -2, 0)
-                else
-                    cell.chevron:SetPoint("LEFT", cell, "LEFT", -9, 0)
+                    cell.chevron:SetPoint("RIGHT", cell, "RIGHT", 0, 0)
                 end
                 cell:SetScript("OnClick", function() opts.onSort(c.key) cols:RefreshHeader() end)
                 cell:SetScript("OnEnter", function(btn) btn.label:SetTextColor(unpack(C.text)) end)
@@ -157,6 +158,18 @@ function Widgets.Columns(columns, opts)
         for i, c in ipairs(columns) do
             local cell = self.header.cells[i]
             if cell.chevron then
+                local sorted = c.key == key
+                if (c.align or "LEFT") == "RIGHT" then
+                    -- only the sorted head moves its text left to make room for the mark
+                    cell.label:ClearAllPoints()
+                    cell.label:SetPoint("TOPLEFT")
+                    cell.label:SetPoint("BOTTOMRIGHT", sorted and -SORT_MARK or 0, 0)
+                else
+                    local text = cell.label.GetStringWidth and cell.label:GetStringWidth() or 0
+                    local room = (c.width or (cell.GetWidth and cell:GetWidth()) or 0) - SORT_MARK
+                    cell.chevron:ClearAllPoints()
+                    cell.chevron:SetPoint("LEFT", cell, "LEFT", math.max(0, math.min((text or 0) + 3, room)), 0)
+                end
                 cell.chevron:SetShown(c.key == key)
                 cell.chevron:SetDirection(opts.sortDesc and opts.sortDesc() and "down" or "up")
                 cell.chevron:SetColor(C.text)

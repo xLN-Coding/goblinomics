@@ -14,6 +14,7 @@ describe("Pricing: valuation rule", function()
 
     before_each(function()
         ns = load_core({ login = true, money = 1 })
+        ns.Price.Config().speculativeMinValue = 0   -- test prices are far below 1000 gold
         Value = ns.Value
         values = { market = {}, destroy = {}, saleRate = {} }
         ns.Price.RegisterSource(fake("tsm", 10, values))
@@ -53,6 +54,18 @@ describe("Pricing: valuation rule", function()
         assert.is_true(r.gaps.saleRate)
         ns.Price.Config().speculativeThreshold = 0.3
         set("saleRate", "i:10", 0.2)
+        assert.equals("speculative", Value.Evaluate("i:10").tier)
+    end)
+
+    it("never marks items below the minimum value (1000 gold each by default) as speculative", function()
+        local cfg = ns.Price.Config()
+        local defaults = ns.CORE_DB_SPEC.defaults.pricing
+        assert.equals(10000000, defaults.speculativeMinValue)
+        cfg.speculativeMinValue = defaults.speculativeMinValue
+        set("market", "i:10", 9999999)                                  -- just below 1000 gold
+        set("saleRate", "i:10", 0.01)
+        assert.equals("market", Value.Evaluate("i:10").tier)
+        set("market", "i:10", 10000000)
         assert.equals("speculative", Value.Evaluate("i:10").tier)
     end)
 

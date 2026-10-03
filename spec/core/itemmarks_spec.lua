@@ -5,6 +5,7 @@ describe("Core: speculative item marks", function()
 
     before_each(function()
         ns = load_core({ login = true, money = 1 })
+        ns.Price.Config().speculativeMinValue = 0   -- test prices are far below 1000 gold
         values = { market = { ["i:1"] = 100000, ["i:2"] = 100000 }, saleRate = { ["i:1"] = 0.01, ["i:2"] = 0.5 } }
         ns.Price.RegisterSource(fake("tsm", 10, values))
     end)
